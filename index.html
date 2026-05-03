@@ -82,39 +82,39 @@
         const SVGField = ({ hits, pendingHit, interactive, clickHandler, refProps, idPrefix = "f1" }) => {
             const allHits = pendingHit ? [...hits, pendingHit] : hits;
             return (
-            <svg ref={refProps} viewBox="0 0 155 100" preserveAspectRatio="xMidYMid meet" className={`w-full h-full drop-shadow-2xl ${interactive ? 'cursor-crosshair' : ''}`} onClick={interactive ? clickHandler : undefined}>
-                <image href="IMG_0664.jpg" x="0" y="0" width="155" height="100" preserveAspectRatio="none" />
-                {allHits.map(hit => {
-                    if (hit.isManual) return null;
-                    const isPending = hit.id === 'pending';
-                    const color = COLORS[hit.type] || '#ffffff';
-                    const q = hit.quality || 'Solid';
-                    const ox = 77.5, oy = 90; 
-                    let path = null;
-                    
-                    if (hit.type === 'Grounder') path = <line x1={ox} y1={oy} x2={hit.x} y2={hit.y} stroke={color} strokeWidth="0.75" strokeDasharray="1.5,1.5" />;
-                    else if (hit.type === 'Line Drive') path = <line x1={ox} y1={oy} x2={hit.x} y2={hit.y} stroke={color} strokeWidth="0.75" />;
-                    else if (hit.type === 'Bunt') path = <line x1={ox} y1={oy} x2={hit.x} y2={hit.y} stroke={color} strokeWidth="1.5" strokeDasharray="0.5,1.5" />;
-                    else if (hit.type === 'Fly Ball') {
-                        const arcDir = hit.x < ox ? 1 : -1;
-                        const dx = hit.x - ox, dy = hit.y - oy;
-                        const len = Math.sqrt(dx*dx + dy*dy) || 1;
-                        const loft = Math.min(20, len * 0.25);
-                        const offX = -(dy/len) * loft * arcDir;
-                        const offY = (dx/len) * loft * arcDir;
-                        path = <path d={`M ${ox} ${oy} Q ${(ox+hit.x)/2+offX} ${(oy+hit.y)/2+offY} ${hit.x} ${hit.y}`} stroke={color} strokeWidth="0.75" fill="none" />;
-                    }
-                    
-                    if (!path) return null; // Ignore purely outcome-based hits on the map
+                <svg ref={refProps} viewBox="0 0 155 100" preserveAspectRatio="xMidYMid meet" className={`w-full h-full drop-shadow-2xl ${interactive ? 'cursor-crosshair' : ''}`} onClick={interactive ? clickHandler : undefined}>
+                    <image href="IMG_0664.jpg" x="0" y="0" width="155" height="100" preserveAspectRatio="none" />
+                    {allHits.map(hit => {
+                        if (hit.isManual) return null;
+                        const isPending = hit.id === 'pending';
+                        const color = COLORS[hit.type] || '#ffffff';
+                        const q = hit.quality || 'Solid';
+                        const ox = 77.5, oy = 90; 
+                        let path = null;
+                        
+                        if (hit.type === 'Grounder') path = <line x1={ox} y1={oy} x2={hit.x} y2={hit.y} stroke={color} strokeWidth="0.75" strokeDasharray="1.5,1.5" />;
+                        else if (hit.type === 'Line Drive') path = <line x1={ox} y1={oy} x2={hit.x} y2={hit.y} stroke={color} strokeWidth="0.75" />;
+                        else if (hit.type === 'Bunt') path = <line x1={ox} y1={oy} x2={hit.x} y2={hit.y} stroke={color} strokeWidth="1.5" strokeDasharray="0.5,1.5" />;
+                        else if (hit.type === 'Fly Ball') {
+                            const arcDir = hit.x < ox ? 1 : -1;
+                            const dx = hit.x - ox, dy = hit.y - oy;
+                            const len = Math.sqrt(dx*dx + dy*dy) || 1;
+                            const loft = Math.min(20, len * 0.25);
+                            const offX = -(dy/len) * loft * arcDir;
+                            const offY = (dx/len) * loft * arcDir;
+                            path = <path d={`M ${ox} ${oy} Q ${(ox+hit.x)/2+offX} ${(oy+hit.y)/2+offY} ${hit.x} ${hit.y}`} stroke={color} strokeWidth="0.75" fill="none" />;
+                        }
+                        
+                        if (!path) return null; // Ignore purely outcome-based hits on the map
 
-                    let marker = null;
-                    if (q === 'Weak') marker = <g transform={`translate(${hit.x}, ${hit.y})`}><line x1="-1.2" y1="-1.2" x2="1.2" y2="1.2" stroke={color} strokeWidth="1.2" /><line x1="1.2" y1="-1.2" x2="-1.2" y2="1.2" stroke={color} strokeWidth="1.2" /></g>;
-                    else if (q === 'Hard') marker = <g transform={`translate(${hit.x}, ${hit.y})`}><line x1="0" y1="-2" x2="0" y2="2" stroke={color} strokeWidth="1.2" /><line x1="-1.5" y1="-1" x2="1.5" y2="1" stroke={color} strokeWidth="1.2" /><line x1="-1.5" y1="1" x2="1.5" y2="-1" stroke={color} strokeWidth="1.2" /></g>;
-                    else marker = <circle cx={hit.x} cy={hit.y} r="1.5" fill={color} stroke="white" strokeWidth="0.5" className="drop-shadow-sm" />;
-                    
-                    return <g key={hit.id} className={`animate-in zoom-in-50 duration-300 ${isPending ? 'animate-pulse drop-shadow-[0_0_10px_rgba(255,255,255,0.9)] opacity-80' : ''}`}>{path}{marker}</g>;
-                })}
-            </svg>
+                        let marker = null;
+                        if (q === 'Weak') marker = <g transform={`translate(${hit.x}, ${hit.y})`}><line x1="-1.2" y1="-1.2" x2="1.2" y2="1.2" stroke={color} strokeWidth="1.2" /><line x1="1.2" y1="-1.2" x2="-1.2" y2="1.2" stroke={color} strokeWidth="1.2" /></g>;
+                        else if (q === 'Hard') marker = <g transform={`translate(${hit.x}, ${hit.y})`}><line x1="0" y1="-2" x2="0" y2="2" stroke={color} strokeWidth="1.2" /><line x1="-1.5" y1="-1" x2="1.5" y2="1" stroke={color} strokeWidth="1.2" /><line x1="-1.5" y1="1" x2="1.5" y2="-1" stroke={color} strokeWidth="1.2" /></g>;
+                        else marker = <circle cx={hit.x} cy={hit.y} r="1.5" fill={color} stroke="white" strokeWidth="0.5" className="drop-shadow-sm" />;
+                        
+                        return <g key={hit.id} className={`animate-in zoom-in-50 duration-300 ${isPending ? 'animate-pulse drop-shadow-[0_0_10px_rgba(255,255,255,0.9)] opacity-80' : ''}`}>{path}{marker}</g>;
+                    })}
+                </svg>
             );
         };
 
@@ -149,10 +149,10 @@
         function App() {
             // Memory State
             const [sprayData, setSprayData] = useState(() => {
-                try { return JSON.parse(localStorage.getItem('cubs_v25') || '{}'); } catch(e) { return {}; }
+                try { return JSON.parse(localStorage.getItem('cubs_v28') || '{}'); } catch(e) { return {}; }
             });
             const [myPitchers, setMyPitchers] = useState(() => {
-                try { return JSON.parse(localStorage.getItem('pitchers_v25') || '[]'); } catch(e) { return []; }
+                try { return JSON.parse(localStorage.getItem('pitchers_v28') || '[]'); } catch(e) { return []; }
             });
             
             // Cloud Sync Engine States
@@ -215,7 +215,6 @@
                 
                 const initFirebase = async () => {
                     try {
-                        // Using your exact keys to bypass test databases and connect directly to yours!
                         const myFirebaseConfig = {
                             apiKey: "AIzaSyDieEBjK0XufnNh7svSuwZKzV1I9mkaK2s",
                             authDomain: "spray-tracker-ea27e.firebaseapp.com",
@@ -225,7 +224,6 @@
                             appId: "1:199824978856:web:d14e99698e6990f720639d"
                         };
 
-                        // Load Firebase Libraries
                         const [
                             { initializeApp }, 
                             { getAuth, signInAnonymously, onAuthStateChanged }, 
@@ -243,14 +241,13 @@
                         
                         fbRefs.current = { db, doc, setDoc, onSnapshot, collection, appId: finalAppId };
 
-                        // Authenticate securely to YOUR project
                         await signInAnonymously(auth);
 
                         onAuthStateChanged(auth, (u) => { if (isMounted) setUser(u); });
                     } catch (err) {
                         console.error("Firebase Init Error:", err);
                         if (isMounted) {
-                            setCloudStatus('Auth Blocked (Check Firebase!)');
+                            setCloudStatus('Auth Blocked (Check Rules!)');
                             setIsCloudReady(true);
                         }
                     }
@@ -278,7 +275,7 @@
                     setIsCloudReady(true);
                 }, (err) => {
                     console.error("Sync Stream Error", err);
-                    setCloudStatus('Sync Error');
+                    setCloudStatus('Permission Denied');
                 });
 
                 return () => unsub();
@@ -294,13 +291,11 @@
                 setSprayData(nextSpray);
                 setMyPitchers(nextPitchersList);
 
-                // Always save locally so data is NEVER lost
                 try {
-                    localStorage.setItem('cubs_v25', JSON.stringify(nextSpray));
-                    localStorage.setItem('pitchers_v25', JSON.stringify(nextPitchersList));
+                    localStorage.setItem('cubs_v28', JSON.stringify(nextSpray));
+                    localStorage.setItem('pitchers_v28', JSON.stringify(nextPitchersList));
                 } catch(e) {}
 
-                // Push to Firebase if wired up
                 if (fbRefs.current?.docRef && user) {
                     try {
                         setCloudStatus('Saving...');
@@ -317,7 +312,6 @@
                 }
             };
 
-            // Prevent accidental refresh data loss
             useEffect(() => {
                 const handleBeforeUnload = (e) => {
                     e.preventDefault();
@@ -915,8 +909,19 @@
                             <aside className="order-2 lg:order-3 w-full lg:w-56 grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-col gap-2 shrink-0 lg:overflow-y-auto scrollbar-hide lg:pb-4">
                                 <div className="bg-white p-3 rounded-xl border shadow-sm shrink-0">
                                     <h3 className="text-[9px] font-black uppercase text-slate-700 mb-2">Contact Log</h3>
-                                    <div className="grid grid-cols-2 gap-1.5 mb-2">{Object.entries(COLORS).map(([n,c])=>(<button key={n} disabled={isViewMode} onClick={()=>setHitType(n)} className={`py-2 px-1 rounded-lg border text-[10px] font-black uppercase flex items-center justify-center sm:justify-start gap-1 outline-none disabled:opacity-50 disabled:grayscale ${hitType===n?'bg-blue-50 border-blue-500 text-blue-700':'bg-white text-slate-500'}`}><div className="w-2 h-2 rounded-full shrink-0" style={{backgroundColor:c}}/><span className="hidden sm:inline">{n}</span><span className="sm:hidden">{n.split(' ')[0]}</span></button>))}</div>
-                                    <div className="flex gap-1 pt-2 border-t border-slate-50">{['Weak','Solid','Hard'].map(q=>(<button key={q} disabled={isViewMode} onClick={()=>setQuality(q)} className={`flex-1 py-1.5 rounded border text-[9px] font-black uppercase outline-none disabled:opacity-50 disabled:grayscale ${quality===q?'bg-blue-600 border-blue-600 text-white shadow-md':'bg-slate-50 text-slate-400'}`}>{q}</button>))}</div>
+                                    <div className="grid grid-cols-2 gap-1.5 mb-2">
+                                        {Object.entries(COLORS).map(([n,c])=>(
+                                            <button key={n} disabled={isViewMode} onClick={()=>setHitType(n)} className={`py-2 px-1 rounded-lg border text-[10px] font-black uppercase flex items-center justify-center sm:justify-start gap-1 outline-none disabled:opacity-50 disabled:grayscale ${hitType===n?'bg-blue-50 border-blue-500 text-blue-700':'bg-white text-slate-500'}`}>
+                                                <div className="w-2 h-2 rounded-full shrink-0" style={{backgroundColor:c}}/>
+                                                <span className="hidden sm:inline">{n}</span><span className="sm:hidden">{n.split(' ')[0]}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <div className="flex gap-1 pt-2 border-t border-slate-50">
+                                        {['Weak','Solid','Hard'].map(q=>(
+                                            <button key={q} disabled={isViewMode} onClick={()=>setQuality(q)} className={`flex-1 py-1.5 rounded border text-[9px] font-black uppercase outline-none disabled:opacity-50 disabled:grayscale ${quality===q?'bg-blue-600 border-blue-600 text-white shadow-md':'bg-slate-50 text-slate-400'}`}>{q}</button>
+                                        ))}
+                                    </div>
                                 </div>
                                 
                                 <div className="bg-white p-3 rounded-xl border shadow-sm shrink-0">
