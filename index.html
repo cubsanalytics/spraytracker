@@ -79,11 +79,14 @@
             [OUTCOMES.ROE]: 'Reach on Error', [OUTCOMES.OUT]: 'Out'
         };
 
-        const SVGField = ({ hits, interactive, clickHandler, refProps, idPrefix = "f1" }) => (
+        const SVGField = ({ hits, pendingHit, interactive, clickHandler, refProps, idPrefix = "f1" }) => {
+            const allHits = pendingHit ? [...hits, pendingHit] : hits;
+            return (
             <svg ref={refProps} viewBox="0 0 155 100" preserveAspectRatio="xMidYMid meet" className={`w-full h-full drop-shadow-2xl ${interactive ? 'cursor-crosshair' : ''}`} onClick={interactive ? clickHandler : undefined}>
                 <image href="IMG_0664.jpg" x="0" y="0" width="155" height="100" preserveAspectRatio="none" />
-                {hits.map(hit => {
+                {allHits.map(hit => {
                     if (hit.isManual) return null;
+                    const isPending = hit.id === 'pending';
                     const color = COLORS[hit.type] || '#ffffff';
                     const q = hit.quality || 'Solid';
                     const ox = 77.5, oy = 90; 
@@ -109,10 +112,11 @@
                     else if (q === 'Hard') marker = <g transform={`translate(${hit.x}, ${hit.y})`}><line x1="0" y1="-2" x2="0" y2="2" stroke={color} strokeWidth="1.2" /><line x1="-1.5" y1="-1" x2="1.5" y2="1" stroke={color} strokeWidth="1.2" /><line x1="-1.5" y1="1" x2="1.5" y2="-1" stroke={color} strokeWidth="1.2" /></g>;
                     else marker = <circle cx={hit.x} cy={hit.y} r="1.5" fill={color} stroke="white" strokeWidth="0.5" className="drop-shadow-sm" />;
                     
-                    return <g key={hit.id} className="animate-in zoom-in-50 duration-300">{path}{marker}</g>;
+                    return <g key={hit.id} className={`animate-in zoom-in-50 duration-300 ${isPending ? 'animate-pulse drop-shadow-[0_0_10px_rgba(255,255,255,0.9)] opacity-80' : ''}`}>{path}{marker}</g>;
                 })}
             </svg>
-        );
+            );
+        };
 
         const ResultsBar = ({ stats, bipCount, totalAB, hitsCount, isSnapshot = false, onEditClick = null, isViewMode = false }) => (
             <div className={`bg-slate-50 border-b border-slate-200 px-3 py-1.5 shrink-0 shadow-sm z-10 ${isSnapshot ? 'border-0 bg-white' : ''}`}>
@@ -179,6 +183,8 @@
             const [quality, setQuality] = useState('Solid');
             const [viewAllPitchers, setViewAllPitchers] = useState(true);
             const svgRefTracker = useRef(null);
+            
+            const [pendingContact, setPendingContact] = useState(null);
             
             // Edit & Delete States
             const [editingTeam, setEditingTeam] = useState(false);
@@ -357,7 +363,17 @@
                 if (pt.x === undefined || pt.y === undefined) return;
                 const svgP = pt.matrixTransform(svg.getScreenCTM().inverse());
                 
-                addOutcome({ x: svgP.x, y: svgP.y, type: hitType, quality, pitcher, isContact: true });
+                setPendingContact({ x: svgP.x, y: svgP.y, type: hitType, quality, pitcher, isContact: true, id: 'pending' });
+            };
+
+            const handlePlayOutcome = (outcome) => {
+                if (isViewMode) return;
+                if (!pendingContact) {
+                    showToast('Please plot the location on the field first!');
+                    return;
+                }
+                addOutcome({ ...pendingContact, outcome });
+                setPendingContact(null);
             };
 
             const addOutcome = (data) => {
@@ -371,6 +387,10 @@
 
             const undo = () => {
                 if (isViewMode) return;
+                if (pendingContact) {
+                    setPendingContact(null);
+                    return;
+                }
                 if (!team || !batter || !sprayData[team]?.[batter]?.length) return;
                 const next = { ...sprayData };
                 const hits = [...next[team][batter]];
@@ -384,14 +404,22 @@
                 if (isViewMode) return;
                 if (!team || !batter) return;
                 if (delta > 0) {
-                    const isContact = Object.keys(COLORS).includes(type);
-                    addOutcome({ type, quality: 'Solid', pitcher: pitcher || 'Unknown', isContact, isManual: true, x: 50, y: 90 });
+                    const isContact = Object.keys(COLORS).includes(type) || [OUTCOMES.SINGLE, OUTCOMES.DOUBLE, OUTCOMES.TRIPLE, OUTCOMES.HR, OUTCOMES.ROE, OUTCOMES.OUT].includes(type);
+                    addOutcome({ 
+                        type: Object.keys(COLORS).includes(type) ? type : 'Line Drive', 
+                        quality: 'Solid', 
+                        outcome: [OUTCOMES.SINGLE, OUTCOMES.DOUBLE, OUTCOMES.TRIPLE, OUTCOMES.HR, OUTCOMES.ROE, OUTCOMES.OUT].includes(type) ? type : null,
+                        pitcher: pitcher || 'Unknown', 
+                        isContact, 
+                        isManual: true, 
+                        x: 50, y: 90 
+                    });
                 } else {
                     const next = { ...sprayData };
                     const hits = [...(next[team][batter] || [])];
                     let removeIdx = -1;
                     for (let i = hits.length - 1; i >= 0; i--) {
-                        if (hits[i].type === type && (viewAllPitchers || hits[i].pitcher === pitcher)) {
+                        if ((hits[i].type === type || hits[i].outcome === type) && (viewAllPitchers || hits[i].pitcher === pitcher)) {
                             removeIdx = i;
                             break;
                         }
@@ -480,10 +508,11 @@
                 contact.forEach(h => {
                     if (stats[h.type] !== undefined) stats[h.type]++;
                     if (stats[h.quality] !== undefined) stats[h.quality]++;
+                    if (h.outcome && stats[h.outcome] !== undefined) stats[h.outcome]++;
                 });
 
                 const hitsCount = stats[OUTCOMES.SINGLE] + stats[OUTCOMES.DOUBLE] + stats[OUTCOMES.TRIPLE] + stats[OUTCOMES.HR];
-                const totalAB = hitsCount + stats[OUTCOMES.OUT] + stats[OUTCOMES.ROE] + stats[OUTCOMES.K_SWING] + stats[OUTCOMES.K_LOOK] + stats['Grounder'] + stats['Line Drive'] + stats['Fly Ball'] + stats['Bunt'];
+                const totalAB = hitsCount + stats[OUTCOMES.OUT] + stats[OUTCOMES.ROE] + stats[OUTCOMES.K_SWING] + stats[OUTCOMES.K_LOOK];
                 
                 return { contact, stats, totalAB, hitsCount };
             };
@@ -855,7 +884,7 @@
                             <div className="flex-1 relative flex items-center justify-center p-2 lg:p-4 bg-slate-100/50 rounded-b-2xl lg:rounded-none">
                                 {activeTab==='tracker' ? (!team||!batter ? <Icon name="target" className="w-12 h-12 opacity-10 text-slate-400" /> : (
                                     <div className="w-full h-auto aspect-[1.5/1] lg:h-full lg:max-h-full bg-slate-800 rounded-xl relative shadow-2xl overflow-hidden border-[4px] sm:border-[6px] border-slate-700 max-w-[1000px]">
-                                        <SVGField hits={trackerData.contact} interactive={!isViewMode} clickHandler={plotContact} refProps={svgRefTracker} idPrefix="tracker" />
+                                        <SVGField hits={trackerData.contact} pendingHit={pendingContact} interactive={!isViewMode} clickHandler={plotContact} refProps={svgRefTracker} idPrefix="tracker" />
                                     </div>
                                 )) : (
                                     <div className="w-full h-auto aspect-[1.5/1] lg:h-full lg:max-h-full bg-slate-800 rounded-xl relative shadow-xl overflow-hidden border-[4px] sm:border-[6px] border-slate-700 max-w-[1000px]">
@@ -884,7 +913,8 @@
                         {/* LOGS/OUTCOMES COLUMN (Tracker Only) */}
                         {activeTab==='tracker' && (
                             <aside className="order-2 lg:order-3 w-full lg:w-56 grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-col gap-2 shrink-0 lg:overflow-y-auto scrollbar-hide lg:pb-4">
-                                <div className="bg-white p-3 rounded-xl border shadow-sm shrink-0"><h3 className="text-[9px] font-black uppercase text-slate-700 mb-2">Contact Log</h3>
+                                <div className="bg-white p-3 rounded-xl border shadow-sm shrink-0">
+                                    <h3 className="text-[9px] font-black uppercase text-slate-700 mb-2">Contact Log</h3>
                                     <div className="grid grid-cols-2 gap-1.5 mb-2">{Object.entries(COLORS).map(([n,c])=>(<button key={n} disabled={isViewMode} onClick={()=>setHitType(n)} className={`py-2 px-1 rounded-lg border text-[10px] font-black uppercase flex items-center justify-center sm:justify-start gap-1 outline-none disabled:opacity-50 disabled:grayscale ${hitType===n?'bg-blue-50 border-blue-500 text-blue-700':'bg-white text-slate-500'}`}><div className="w-2 h-2 rounded-full shrink-0" style={{backgroundColor:c}}/><span className="hidden sm:inline">{n}</span><span className="sm:hidden">{n.split(' ')[0]}</span></button>))}</div>
                                     <div className="flex gap-1 pt-2 border-t border-slate-50">{['Weak','Solid','Hard'].map(q=>(<button key={q} disabled={isViewMode} onClick={()=>setQuality(q)} className={`flex-1 py-1.5 rounded border text-[9px] font-black uppercase outline-none disabled:opacity-50 disabled:grayscale ${quality===q?'bg-blue-600 border-blue-600 text-white shadow-md':'bg-slate-50 text-slate-400'}`}>{q}</button>))}</div>
                                 </div>
@@ -892,21 +922,27 @@
                                 <div className="bg-white p-3 rounded-xl border shadow-sm shrink-0">
                                     <h3 className="text-[9px] font-black uppercase text-slate-700 mb-2">Plate Appearances</h3>
                                     <div className="grid grid-cols-2 gap-1.5">
-                                        <button disabled={isViewMode} onClick={()=>{if(!pitcher){showToast('Please select Our Pitcher!');return;} addOutcome({ type: OUTCOMES.WALK, pitcher, isContact: false })}} className="py-2.5 bg-blue-50 border-blue-200 border rounded-lg font-black text-[11px] text-blue-800 active:scale-95 outline-none disabled:opacity-50 disabled:grayscale">BB</button>
-                                        <button disabled={isViewMode} onClick={()=>{if(!pitcher){showToast('Please select Our Pitcher!');return;} addOutcome({ type: OUTCOMES.HBP, pitcher, isContact: false })}} className="py-2.5 bg-blue-50 border-blue-200 border rounded-lg font-black text-[11px] text-blue-800 active:scale-95 outline-none disabled:opacity-50 disabled:grayscale">HBP</button>
-                                        <button disabled={isViewMode} onClick={()=>{if(!pitcher){showToast('Please select Our Pitcher!');return;} addOutcome({ type: OUTCOMES.K_SWING, pitcher, isContact: false })}} className="py-2.5 bg-red-50 border-red-200 border rounded-lg font-black text-[11px] text-red-800 active:scale-95 outline-none disabled:opacity-50 disabled:grayscale">K</button>
-                                        <button disabled={isViewMode} onClick={()=>{if(!pitcher){showToast('Please select Our Pitcher!');return;} addOutcome({ type: OUTCOMES.K_LOOK, pitcher, isContact: false })}} className="py-2.5 bg-red-50 border-red-200 border rounded-lg font-black text-[11px] text-red-800 active:scale-95 outline-none disabled:opacity-50 disabled:grayscale">ꓘ</button>
+                                        <button disabled={isViewMode} onClick={()=>{if(!pitcher){showToast('Please select Our Pitcher!');return;} addOutcome({ type: OUTCOMES.WALK, pitcher, isContact: false }); setPendingContact(null);}} className="py-2.5 bg-blue-50 border-blue-200 border rounded-lg font-black text-[11px] text-blue-800 active:scale-95 outline-none disabled:opacity-50 disabled:grayscale">BB</button>
+                                        <button disabled={isViewMode} onClick={()=>{if(!pitcher){showToast('Please select Our Pitcher!');return;} addOutcome({ type: OUTCOMES.HBP, pitcher, isContact: false }); setPendingContact(null);}} className="py-2.5 bg-blue-50 border-blue-200 border rounded-lg font-black text-[11px] text-blue-800 active:scale-95 outline-none disabled:opacity-50 disabled:grayscale">HBP</button>
+                                        <button disabled={isViewMode} onClick={()=>{if(!pitcher){showToast('Please select Our Pitcher!');return;} addOutcome({ type: OUTCOMES.K_SWING, pitcher, isContact: false }); setPendingContact(null);}} className="py-2.5 bg-red-50 border-red-200 border rounded-lg font-black text-[11px] text-red-800 active:scale-95 outline-none disabled:opacity-50 disabled:grayscale">K</button>
+                                        <button disabled={isViewMode} onClick={()=>{if(!pitcher){showToast('Please select Our Pitcher!');return;} addOutcome({ type: OUTCOMES.K_LOOK, pitcher, isContact: false }); setPendingContact(null);}} className="py-2.5 bg-red-50 border-red-200 border rounded-lg font-black text-[11px] text-red-800 active:scale-95 outline-none disabled:opacity-50 disabled:grayscale">ꓘ</button>
                                     </div>
 
-                                    <h3 className="text-[9px] font-black uppercase text-slate-700 mt-4 mb-2">Play Outcomes</h3>
-                                    <div className="grid grid-cols-3 gap-1.5">
-                                        <button disabled={isViewMode} onClick={()=>{if(!pitcher){showToast('Please select Our Pitcher!');return;} addOutcome({ type: OUTCOMES.SINGLE, pitcher, isContact: false })}} className="py-2 bg-slate-50 border border-slate-200 rounded text-[10px] font-black active:scale-95 outline-none disabled:opacity-50 disabled:grayscale text-slate-800 hover:bg-slate-100">1B</button>
-                                        <button disabled={isViewMode} onClick={()=>{if(!pitcher){showToast('Please select Our Pitcher!');return;} addOutcome({ type: OUTCOMES.DOUBLE, pitcher, isContact: false })}} className="py-2 bg-slate-50 border border-slate-200 rounded text-[10px] font-black active:scale-95 outline-none disabled:opacity-50 disabled:grayscale text-slate-800 hover:bg-slate-100">2B</button>
-                                        <button disabled={isViewMode} onClick={()=>{if(!pitcher){showToast('Please select Our Pitcher!');return;} addOutcome({ type: OUTCOMES.TRIPLE, pitcher, isContact: false })}} className="py-2 bg-slate-50 border border-slate-200 rounded text-[10px] font-black active:scale-95 outline-none disabled:opacity-50 disabled:grayscale text-slate-800 hover:bg-slate-100">3B</button>
-                                        <button disabled={isViewMode} onClick={()=>{if(!pitcher){showToast('Please select Our Pitcher!');return;} addOutcome({ type: OUTCOMES.HR, pitcher, isContact: false })}} className="py-2 bg-slate-50 border border-slate-200 rounded text-[10px] font-black active:scale-95 outline-none disabled:opacity-50 disabled:grayscale text-slate-800 hover:bg-slate-100">HR</button>
-                                        <button disabled={isViewMode} onClick={()=>{if(!pitcher){showToast('Please select Our Pitcher!');return;} addOutcome({ type: OUTCOMES.ROE, pitcher, isContact: false })}} className="py-2 bg-orange-50 border border-orange-200 rounded text-[10px] font-black active:scale-95 outline-none disabled:opacity-50 disabled:grayscale text-orange-800 hover:bg-orange-100">ROE</button>
-                                        <button disabled={isViewMode} onClick={()=>{if(!pitcher){showToast('Please select Our Pitcher!');return;} addOutcome({ type: OUTCOMES.OUT, pitcher, isContact: false })}} className="py-2 bg-slate-100 border border-slate-300 rounded text-[10px] font-black active:scale-95 outline-none disabled:opacity-50 disabled:grayscale text-slate-800 hover:bg-slate-200">OUT</button>
+                                    <div className="flex items-center justify-between mt-4 mb-2">
+                                        <h3 className="text-[9px] font-black uppercase text-slate-700">Play Outcomes</h3>
+                                        {pendingContact && <span className="text-[8px] bg-green-500 text-white px-1.5 py-0.5 rounded font-bold animate-pulse shadow-sm">Location Plotted!</span>}
                                     </div>
+                                    <div className={`grid grid-cols-3 gap-1.5 transition-opacity ${!pendingContact && !isViewMode ? 'opacity-50' : 'opacity-100'}`}>
+                                        <button disabled={isViewMode || !pendingContact} onClick={()=>handlePlayOutcome(OUTCOMES.SINGLE)} className="py-2 bg-slate-50 border border-slate-200 rounded text-[10px] font-black active:scale-95 outline-none disabled:grayscale text-slate-800 hover:bg-slate-100">1B</button>
+                                        <button disabled={isViewMode || !pendingContact} onClick={()=>handlePlayOutcome(OUTCOMES.DOUBLE)} className="py-2 bg-slate-50 border border-slate-200 rounded text-[10px] font-black active:scale-95 outline-none disabled:grayscale text-slate-800 hover:bg-slate-100">2B</button>
+                                        <button disabled={isViewMode || !pendingContact} onClick={()=>handlePlayOutcome(OUTCOMES.TRIPLE)} className="py-2 bg-slate-50 border border-slate-200 rounded text-[10px] font-black active:scale-95 outline-none disabled:grayscale text-slate-800 hover:bg-slate-100">3B</button>
+                                        <button disabled={isViewMode || !pendingContact} onClick={()=>handlePlayOutcome(OUTCOMES.HR)} className="py-2 bg-slate-50 border border-slate-200 rounded text-[10px] font-black active:scale-95 outline-none disabled:grayscale text-slate-800 hover:bg-slate-100">HR</button>
+                                        <button disabled={isViewMode || !pendingContact} onClick={()=>handlePlayOutcome(OUTCOMES.ROE)} className="py-2 bg-orange-50 border border-orange-200 rounded text-[10px] font-black active:scale-95 outline-none disabled:grayscale text-orange-800 hover:bg-orange-100">ROE</button>
+                                        <button disabled={isViewMode || !pendingContact} onClick={()=>handlePlayOutcome(OUTCOMES.OUT)} className="py-2 bg-slate-100 border border-slate-300 rounded text-[10px] font-black active:scale-95 outline-none disabled:grayscale text-slate-800 hover:bg-slate-200">OUT</button>
+                                    </div>
+                                    {!isViewMode && pendingContact && (
+                                        <button onClick={()=>setPendingContact(null)} className="w-full mt-2 py-1.5 bg-slate-200 text-slate-600 rounded text-[9px] font-black uppercase tracking-tighter hover:bg-slate-300 active:scale-95 transition-colors">Cancel Plotted Location</button>
+                                    )}
                                 </div>
                             </aside>
                         )}
