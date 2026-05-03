@@ -1,0 +1,922 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Cubs Spray Tracker</title>
+    
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+        body { 
+            font-family: 'Inter', sans-serif; 
+            -webkit-tap-highlight-color: transparent; 
+            background-color: #f1f5f9; 
+            overscroll-behavior: none; 
+        }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        select, input[type="date"] { 
+            appearance: none; 
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); 
+            background-repeat: no-repeat; 
+            background-position: right 0.5rem center; 
+            background-size: 1em; 
+        }
+        input[type="date"]::-webkit-calendar-picker-indicator { display: none; -webkit-appearance: none; }
+    </style>
+</head>
+<body class="overflow-hidden">
+    <div id="root"></div>
+
+    <script type="text/babel" data-type="module">
+        const { useState, useRef, useEffect, Fragment } = React;
+
+        const Icon = ({ name, className = "w-4 h-4" }) => {
+            let content = null;
+            switch (name) {
+                case 'target': content = <Fragment><path d="M12 13a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z"/><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/></Fragment>; break;
+                case 'plus': content = <path d="M5 12h14m-7-7v14"/>; break;
+                case 'minus': content = <line x1="5" y1="12" x2="19" y2="12"/>; break;
+                case 'trash': content = <path d="M3 6h18m-2 0v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>; break;
+                case 'edit': content = <Fragment><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></Fragment>; break;
+                case 'save': content = <Fragment><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><path d="M7 3v5h8"/></Fragment>; break;
+                case 'x': content = <path d="M18 6 6 18M6 6l12 12"/>; break;
+                case 'activity': content = <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>; break;
+                case 'crosshair': content = <Fragment><circle cx="12" cy="12" r="10"/><line x1="22" y1="12" x2="18" y2="12"/><line x1="6" y1="12" x2="2" y2="12"/><line x1="12" y1="6" x2="12" y2="2"/><line x1="12" y1="22" x2="12" y2="18"/></Fragment>; break;
+                case 'rotate': content = <Fragment><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><polyline points="3 3 3 8 8 8"/></Fragment>; break;
+                case 'camera': content = <Fragment><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></Fragment>; break;
+                case 'download': content = <Fragment><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></Fragment>; break;
+                case 'upload': content = <Fragment><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></Fragment>; break;
+                case 'calendar': content = <Fragment><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></Fragment>; break;
+                case 'lock': content = <Fragment><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></Fragment>; break;
+                case 'unlock': content = <Fragment><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></Fragment>; break;
+                case 'map': content = <Fragment><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></Fragment>; break;
+            }
+            return (
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                    {content}
+                </svg>
+            );
+        };
+
+        const COLORS = { 'Grounder': '#eab308', 'Line Drive': '#3b82f6', 'Fly Ball': '#ef4444', 'Bunt': '#a855f7' };
+        
+        // Expanded Outcomes
+        const OUTCOMES = { 
+            K_SWING: 'K', K_LOOK: 'ꓘ', WALK: 'BB', HBP: 'HBP',
+            SINGLE: '1B', DOUBLE: '2B', TRIPLE: '3B', HR: 'HR',
+            ROE: 'ROE', OUT: 'OUT'
+        };
+        const OUTCOME_LABELS = { 
+            [OUTCOMES.K_SWING]: 'K (Swing)', [OUTCOMES.K_LOOK]: 'ꓘ (Look)', 
+            [OUTCOMES.WALK]: 'Walk', [OUTCOMES.HBP]: 'HBP',
+            [OUTCOMES.SINGLE]: 'Single', [OUTCOMES.DOUBLE]: 'Double', 
+            [OUTCOMES.TRIPLE]: 'Triple', [OUTCOMES.HR]: 'Home Run',
+            [OUTCOMES.ROE]: 'Reach on Error', [OUTCOMES.OUT]: 'Out'
+        };
+
+        const SVGField = ({ hits, interactive, clickHandler, refProps, idPrefix = "f1" }) => (
+            <svg ref={refProps} viewBox="0 0 155 100" preserveAspectRatio="xMidYMid meet" className={`w-full h-full drop-shadow-2xl ${interactive ? 'cursor-crosshair' : ''}`} onClick={interactive ? clickHandler : undefined}>
+                <image href="IMG_0664.jpg" x="0" y="0" width="155" height="100" preserveAspectRatio="none" />
+                {hits.map(hit => {
+                    if (hit.isManual) return null;
+                    const color = COLORS[hit.type] || '#ffffff';
+                    const q = hit.quality || 'Solid';
+                    const ox = 77.5, oy = 90; 
+                    let path = null;
+                    
+                    if (hit.type === 'Grounder') path = <line x1={ox} y1={oy} x2={hit.x} y2={hit.y} stroke={color} strokeWidth="0.75" strokeDasharray="1.5,1.5" />;
+                    else if (hit.type === 'Line Drive') path = <line x1={ox} y1={oy} x2={hit.x} y2={hit.y} stroke={color} strokeWidth="0.75" />;
+                    else if (hit.type === 'Bunt') path = <line x1={ox} y1={oy} x2={hit.x} y2={hit.y} stroke={color} strokeWidth="1.5" strokeDasharray="0.5,1.5" />;
+                    else if (hit.type === 'Fly Ball') {
+                        const arcDir = hit.x < ox ? 1 : -1;
+                        const dx = hit.x - ox, dy = hit.y - oy;
+                        const len = Math.sqrt(dx*dx + dy*dy) || 1;
+                        const loft = Math.min(20, len * 0.25);
+                        const offX = -(dy/len) * loft * arcDir;
+                        const offY = (dx/len) * loft * arcDir;
+                        path = <path d={`M ${ox} ${oy} Q ${(ox+hit.x)/2+offX} ${(oy+hit.y)/2+offY} ${hit.x} ${hit.y}`} stroke={color} strokeWidth="0.75" fill="none" />;
+                    }
+                    
+                    if (!path) return null; // Ignore purely outcome-based hits on the map
+
+                    let marker = null;
+                    if (q === 'Weak') marker = <g transform={`translate(${hit.x}, ${hit.y})`}><line x1="-1.2" y1="-1.2" x2="1.2" y2="1.2" stroke={color} strokeWidth="1.2" /><line x1="1.2" y1="-1.2" x2="-1.2" y2="1.2" stroke={color} strokeWidth="1.2" /></g>;
+                    else if (q === 'Hard') marker = <g transform={`translate(${hit.x}, ${hit.y})`}><line x1="0" y1="-2" x2="0" y2="2" stroke={color} strokeWidth="1.2" /><line x1="-1.5" y1="-1" x2="1.5" y2="1" stroke={color} strokeWidth="1.2" /><line x1="-1.5" y1="1" x2="1.5" y2="-1" stroke={color} strokeWidth="1.2" /></g>;
+                    else marker = <circle cx={hit.x} cy={hit.y} r="1.5" fill={color} stroke="white" strokeWidth="0.5" className="drop-shadow-sm" />;
+                    
+                    return <g key={hit.id} className="animate-in zoom-in-50 duration-300">{path}{marker}</g>;
+                })}
+            </svg>
+        );
+
+        const ResultsBar = ({ stats, bipCount, totalAB, hitsCount, isSnapshot = false, onEditClick = null, isViewMode = false }) => (
+            <div className={`bg-slate-50 border-b border-slate-200 px-3 py-1.5 shrink-0 shadow-sm z-10 ${isSnapshot ? 'border-0 bg-white' : ''}`}>
+                <div className="flex flex-col gap-1">
+                    <div className="flex items-center justify-between">
+                        <div className="text-[8px] font-black uppercase text-slate-400 tracking-tighter flex items-center gap-1">
+                            <Icon name="activity" className="w-2.5 h-2.5 text-blue-700" /> Results
+                            {onEditClick && !isViewMode && (
+                                <button onClick={onEditClick} className="ml-1 bg-slate-200 text-slate-600 hover:bg-blue-100 hover:text-blue-700 p-1 rounded transition-colors">
+                                    <Icon name="edit" className="w-2.5 h-2.5" />
+                                </button>
+                            )}
+                        </div>
+                        <div className="flex items-center gap-2 sm:gap-3 text-[11px] font-black">
+                            <div className="flex items-center gap-1"><span className="text-slate-400 text-[8px] uppercase">AB</span><span className="text-slate-900 bg-white px-1.5 py-0.5 rounded border border-slate-200">{totalAB}</span></div>
+                            <div className="flex items-center gap-1"><span className="text-slate-400 text-[8px] uppercase">H</span><span className="text-slate-900 bg-white px-1.5 py-0.5 rounded border border-slate-200">{hitsCount}</span></div>
+                            <div className="flex items-center gap-1"><span className="text-blue-400 text-[8px] uppercase">BB</span><span className="text-blue-700 bg-blue-100/50 px-1.5 py-0.5 rounded">{stats[OUTCOMES.WALK] || 0}</span></div>
+                        </div>
+                    </div>
+                    <div className="flex items-center justify-end gap-3 sm:gap-5 text-[11px] font-black border-t border-slate-100 pt-1 mt-0.5">
+                        <div className="flex items-center gap-1"><span className="text-red-400 text-[8px] uppercase font-bold">K</span><span className="text-red-600 bg-red-50 px-1.5 py-0.5 rounded">{stats[OUTCOMES.K_SWING] || 0}</span></div>
+                        <div className="flex items-center gap-1"><span className="text-red-400 text-[10px] uppercase font-black tracking-tighter">ꓘ</span><span className="text-red-600 bg-red-50 px-1.5 py-0.5 rounded">{stats[OUTCOMES.K_LOOK] || 0}</span></div>
+                        <div className="flex items-center gap-1"><span className="text-slate-400 text-[8px] uppercase font-bold tracking-tighter">ROE</span><span className="text-orange-700 bg-orange-100/50 px-1.5 py-0.5 rounded">{stats[OUTCOMES.ROE] || 0}</span></div>
+                        <div className="flex items-center gap-1 border-l border-slate-200 pl-2 sm:pl-3 ml-1"><span className="text-slate-400 text-[8px] uppercase font-bold tracking-tighter">BIP</span><span className="text-blue-700">{bipCount}</span></div>
+                    </div>
+                </div>
+            </div>
+        );
+
+        function App() {
+            // Memory State
+            const [sprayData, setSprayData] = useState(() => {
+                try { return JSON.parse(localStorage.getItem('cubs_v25') || '{}'); } catch(e) { return {}; }
+            });
+            const [myPitchers, setMyPitchers] = useState(() => {
+                try { return JSON.parse(localStorage.getItem('pitchers_v25') || '[]'); } catch(e) { return []; }
+            });
+            
+            // Cloud Sync Engine States
+            const [isCloudReady, setIsCloudReady] = useState(false);
+            const [cloudStatus, setCloudStatus] = useState('Connecting...');
+            const [user, setUser] = useState(null);
+            
+            // UI States
+            const [activeTab, setActiveTab] = useState('tracker');
+            const [isViewMode, setIsViewMode] = useState(true); // Default to locked View Mode for safety
+            const [snapshotMode, setSnapshotMode] = useState(false);
+            const [showDataModal, setShowDataModal] = useState(false);
+            const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
+            const [showStatEditor, setShowStatEditor] = useState(false);
+            const [clearConfirm, setClearConfirm] = useState(false); 
+            const [logoError, setLogoError] = useState(false);
+            const [toast, setToast] = useState({ show: false, msg: '', type: 'error' });
+            
+            // Selection States
+            const [gameDate, setGameDate] = useState(() => new Date().toISOString().slice(0, 10));
+            const [team, setTeam] = useState('');
+            const [batter, setBatter] = useState('');
+            const [pitcher, setPitcher] = useState('');
+            const [newT, setNewT] = useState('');
+            const [newB, setNewB] = useState('');
+            const [newP, setNewP] = useState('');
+            const [hitType, setHitType] = useState('Line Drive');
+            const [quality, setQuality] = useState('Solid');
+            const [viewAllPitchers, setViewAllPitchers] = useState(true);
+            const svgRefTracker = useRef(null);
+            
+            // Edit & Delete States
+            const [editingTeam, setEditingTeam] = useState(false);
+            const [editTeamName, setEditTeamName] = useState('');
+            const [teamDelConfirm, setTeamDelConfirm] = useState(false);
+            const [editingBatter, setEditingBatter] = useState(false);
+            const [editBatterName, setEditBatterName] = useState('');
+            const [batterDelConfirm, setBatterDelConfirm] = useState(false);
+            const [editingPitcher, setEditingPitcher] = useState(false);
+            const [editPitcherName, setEditPitcherName] = useState('');
+            const [pitcherDelConfirm, setPitcherDelConfirm] = useState(false);
+
+            // Analytics States
+            const [anaDate, setAnaDate] = useState('ALL');
+            const [anaPitcher, setAnaPitcher] = useState('ALL');
+            const [anaTeam, setAnaTeam] = useState('ALL');
+            const [anaBatter, setAnaBatter] = useState('ALL');
+            const [analyzeMode, setAnalyzeMode] = useState('pitcher');
+            const [anaFilterTeam, setAnaFilterTeam] = useState('ALL');
+
+            const fbRefs = useRef(null);
+
+            // =========================================================================
+            //  DYNAMIC CLOUD INITIALIZATION WITH YOUR HARDCODED FIREBASE KEYS
+            // =========================================================================
+            useEffect(() => {
+                let isMounted = true;
+                
+                const initFirebase = async () => {
+                    try {
+                        // Using your exact keys to bypass test databases and connect directly to yours!
+                        const myFirebaseConfig = {
+                            apiKey: "AIzaSyDieEBjK0XufnNh7svSuwZKzV1I9mkaK2s",
+                            authDomain: "spray-tracker-ea27e.firebaseapp.com",
+                            projectId: "spray-tracker-ea27e",
+                            storageBucket: "spray-tracker-ea27e.firebasestorage.app",
+                            messagingSenderId: "199824978856",
+                            appId: "1:199824978856:web:d14e99698e6990f720639d"
+                        };
+
+                        // Load Firebase Libraries
+                        const [
+                            { initializeApp }, 
+                            { getAuth, signInAnonymously, onAuthStateChanged }, 
+                            { getFirestore, doc, setDoc, onSnapshot, collection }
+                        ] = await Promise.all([
+                            import('https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js'),
+                            import('https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js'),
+                            import('https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js')
+                        ]);
+
+                        const app = initializeApp(myFirebaseConfig);
+                        const auth = getAuth(app);
+                        const db = getFirestore(app);
+                        const finalAppId = 'cubs-tracker-app';
+                        
+                        fbRefs.current = { db, doc, setDoc, onSnapshot, collection, appId: finalAppId };
+
+                        // Authenticate securely to YOUR project
+                        await signInAnonymously(auth);
+
+                        onAuthStateChanged(auth, (u) => { if (isMounted) setUser(u); });
+                    } catch (err) {
+                        console.error("Firebase Init Error:", err);
+                        if (isMounted) {
+                            setCloudStatus('Auth Blocked (Check Firebase!)');
+                            setIsCloudReady(true);
+                        }
+                    }
+                };
+
+                initFirebase();
+                return () => { isMounted = false; };
+            }, []);
+
+            // LISTEN TO LIVE CLOUD DATA
+            useEffect(() => {
+                if (!user || !fbRefs.current) return;
+                const { db, doc, onSnapshot, appId } = fbRefs.current;
+                
+                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'cubsAppData', 'sharedState');
+                fbRefs.current.docRef = docRef;
+
+                const unsub = onSnapshot(docRef, (snap) => {
+                    if (snap.exists()) {
+                        const data = snap.data();
+                        if (data.sprayData) setSprayData(JSON.parse(data.sprayData));
+                        if (data.myPitchers) setMyPitchers(JSON.parse(data.myPitchers));
+                    }
+                    setCloudStatus('Live Sync');
+                    setIsCloudReady(true);
+                }, (err) => {
+                    console.error("Sync Stream Error", err);
+                    setCloudStatus('Sync Error');
+                });
+
+                return () => unsub();
+            }, [user]);
+
+            // Centralized Save System (Cloud + Local Fallback)
+            const saveState = async (newSprayData, newPitchers) => {
+                if (isViewMode) return; 
+                
+                const nextSpray = newSprayData || sprayData;
+                const nextPitchersList = newPitchers || myPitchers;
+                
+                setSprayData(nextSpray);
+                setMyPitchers(nextPitchersList);
+
+                // Always save locally so data is NEVER lost
+                try {
+                    localStorage.setItem('cubs_v25', JSON.stringify(nextSpray));
+                    localStorage.setItem('pitchers_v25', JSON.stringify(nextPitchersList));
+                } catch(e) {}
+
+                // Push to Firebase if wired up
+                if (fbRefs.current?.docRef && user) {
+                    try {
+                        setCloudStatus('Saving...');
+                        await fbRefs.current.setDoc(fbRefs.current.docRef, {
+                            sprayData: JSON.stringify(nextSpray),
+                            myPitchers: JSON.stringify(nextPitchersList),
+                            updatedAt: Date.now()
+                        });
+                        setCloudStatus('Live Sync');
+                    } catch(e) {
+                        console.error("Save Error", e);
+                        setCloudStatus('Save Error (Saved Locally)');
+                    }
+                }
+            };
+
+            // Prevent accidental refresh data loss
+            useEffect(() => {
+                const handleBeforeUnload = (e) => {
+                    e.preventDefault();
+                    e.returnValue = "Are you sure you want to refresh? You may lose your session if offline!";
+                    return e.returnValue;
+                };
+                window.addEventListener('beforeunload', handleBeforeUnload);
+                window.history.pushState({ trapped: true }, null, window.location.href);
+
+                const handlePopState = () => {
+                    const confirmLeave = window.confirm("WARNING: Navigating back will erase your current session if you are offline. Are you absolutely sure?");
+                    if (confirmLeave) {
+                        window.removeEventListener('popstate', handlePopState);
+                        window.history.back(); 
+                    } else {
+                        window.history.pushState({ trapped: true }, null, window.location.href);
+                    }
+                };
+                window.addEventListener('popstate', handlePopState);
+
+                return () => {
+                    window.removeEventListener('beforeunload', handleBeforeUnload);
+                    window.removeEventListener('popstate', handlePopState);
+                };
+            }, []);
+
+            const showToast = (msg, type = 'error') => {
+                setToast({ show: true, msg, type });
+                setTimeout(() => setToast({ show: false, msg: '', type: 'error' }), 3000);
+            };
+
+            const plotContact = (e) => {
+                if (isViewMode) return;
+                if (!pitcher) { showToast('Please select Our Pitcher first!'); return; }
+                if (!team || !batter || !svgRefTracker.current) return;
+                
+                const svg = svgRefTracker.current;
+                const pt = svg.createSVGPoint();
+                
+                pt.x = e.clientX || (e.touches && e.touches[0].clientX);
+                pt.y = e.clientY || (e.touches && e.touches[0].clientY);
+                
+                if (pt.x === undefined || pt.y === undefined) return;
+                const svgP = pt.matrixTransform(svg.getScreenCTM().inverse());
+                
+                addOutcome({ x: svgP.x, y: svgP.y, type: hitType, quality, pitcher, isContact: true });
+            };
+
+            const addOutcome = (data) => {
+                if (isViewMode) return;
+                const next = { ...sprayData };
+                if (!next[team]) next[team] = {};
+                if (!next[team][batter]) next[team][batter] = [];
+                next[team][batter].push({ ...data, date: gameDate, id: Date.now() });
+                saveState(next, null);
+            };
+
+            const undo = () => {
+                if (isViewMode) return;
+                if (!team || !batter || !sprayData[team]?.[batter]?.length) return;
+                const next = { ...sprayData };
+                const hits = [...next[team][batter]];
+                if (viewAllPitchers) hits.pop();
+                else { for (let i = hits.length-1; i>=0; i--) { if (hits[i].pitcher === pitcher) { hits.splice(i,1); break; } } }
+                next[team][batter] = hits;
+                saveState(next, null);
+            };
+
+            const adjustStat = (type, delta) => {
+                if (isViewMode) return;
+                if (!team || !batter) return;
+                if (delta > 0) {
+                    const isContact = Object.keys(COLORS).includes(type);
+                    addOutcome({ type, quality: 'Solid', pitcher: pitcher || 'Unknown', isContact, isManual: true, x: 50, y: 90 });
+                } else {
+                    const next = { ...sprayData };
+                    const hits = [...(next[team][batter] || [])];
+                    let removeIdx = -1;
+                    for (let i = hits.length - 1; i >= 0; i--) {
+                        if (hits[i].type === type && (viewAllPitchers || hits[i].pitcher === pitcher)) {
+                            removeIdx = i;
+                            break;
+                        }
+                    }
+                    if (removeIdx !== -1) {
+                        hits.splice(removeIdx, 1);
+                        next[team][batter] = hits;
+                        saveState(next, null);
+                    }
+                }
+            };
+
+            const handleEditTeam = () => {
+                if (isViewMode) return;
+                if (!editTeamName || editTeamName === team || sprayData[editTeamName]) { setEditingTeam(false); return; }
+                const next = { ...sprayData };
+                next[editTeamName] = next[team];
+                delete next[team];
+                saveState(next, null);
+                setTeam(editTeamName); setEditingTeam(false);
+                if (anaTeam === team) setAnaTeam(editTeamName);
+            };
+            const handleDeleteTeam = () => {
+                if (isViewMode) return;
+                const next = { ...sprayData };
+                delete next[team];
+                saveState(next, null);
+                setTeam(''); setBatter(''); setTeamDelConfirm(false);
+                if (anaTeam === team) setAnaTeam('ALL');
+            };
+
+            const handleEditBatter = () => {
+                if (isViewMode) return;
+                if (!editBatterName || editBatterName === batter || sprayData[team][editBatterName]) { setEditingBatter(false); return; }
+                const next = { ...sprayData };
+                next[team][editBatterName] = next[team][batter];
+                delete next[team][batter];
+                saveState(next, null);
+                setBatter(editBatterName); setEditingBatter(false);
+                if (anaBatter === batter) setAnaBatter(editBatterName);
+            };
+            const handleDeleteBatter = () => {
+                if (isViewMode) return;
+                const next = { ...sprayData };
+                delete next[team][batter];
+                saveState(next, null);
+                setBatter(''); setBatterDelConfirm(false);
+                if (anaBatter === batter) setAnaBatter('ALL');
+            };
+
+            const handleEditPitcher = () => {
+                if (isViewMode) return;
+                if (!editPitcherName || editPitcherName === pitcher || myPitchers.includes(editPitcherName)) { setEditingPitcher(false); return; }
+                const nextPitchers = myPitchers.map(p => p === pitcher ? editPitcherName : p);
+                const nextData = { ...sprayData };
+                Object.keys(nextData).forEach(t => {
+                    Object.keys(nextData[t]).forEach(b => {
+                        nextData[t][b] = nextData[t][b].map(h => h.pitcher === pitcher ? { ...h, pitcher: editPitcherName } : h);
+                    });
+                });
+                saveState(nextData, nextPitchers);
+                setPitcher(editPitcherName); setEditingPitcher(false);
+                if (anaPitcher === pitcher) setAnaPitcher(editPitcherName);
+            };
+            const handleDeletePitcher = () => {
+                if (isViewMode) return;
+                const nextPitchers = myPitchers.filter(p => p !== pitcher);
+                saveState(null, nextPitchers);
+                setPitcher(''); setPitcherDelConfirm(false);
+                if (anaPitcher === pitcher) setAnaPitcher('ALL');
+            };
+
+            const calculateTallies = (hits) => {
+                const contact = hits.filter(h => h.isContact);
+                const nonContact = hits.filter(h => !h.isContact);
+                
+                const stats = {};
+                Object.values(OUTCOMES).forEach(o => stats[o] = 0);
+                Object.keys(COLORS).forEach(c => stats[c] = 0);
+                ['Hard', 'Solid', 'Weak'].forEach(q => stats[q] = 0);
+
+                // Count non-contact outcomes
+                nonContact.forEach(h => { if (stats[h.type] !== undefined) stats[h.type]++; });
+                
+                // Count contact hits
+                contact.forEach(h => {
+                    if (stats[h.type] !== undefined) stats[h.type]++;
+                    if (stats[h.quality] !== undefined) stats[h.quality]++;
+                });
+
+                const hitsCount = stats[OUTCOMES.SINGLE] + stats[OUTCOMES.DOUBLE] + stats[OUTCOMES.TRIPLE] + stats[OUTCOMES.HR];
+                const totalAB = hitsCount + stats[OUTCOMES.OUT] + stats[OUTCOMES.ROE] + stats[OUTCOMES.K_SWING] + stats[OUTCOMES.K_LOOK] + stats['Grounder'] + stats['Line Drive'] + stats['Fly Ball'] + stats['Bunt'];
+                
+                return { contact, stats, totalAB, hitsCount };
+            };
+
+            const getAggHits = () => {
+                let hits = [];
+                Object.entries(sprayData).forEach(([t, bObj]) => {
+                    if (anaTeam !== 'ALL' && t !== anaTeam) return;
+                    Object.entries(bObj).forEach(([b, bHits]) => {
+                        if (anaBatter !== 'ALL' && b !== anaBatter) return;
+                        bHits.forEach(h => {
+                            if (anaPitcher !== 'ALL' && h.pitcher !== anaPitcher) return;
+                            if (anaDate !== 'ALL' && h.date !== anaDate) return;
+                            hits.push(h);
+                        });
+                    });
+                });
+                return hits;
+            };
+
+            const getAllDates = () => {
+                const dates = new Set();
+                Object.values(sprayData).forEach(bObj => Object.values(bObj).forEach(hits => hits.forEach(h => h.date && dates.add(h.date))));
+                return Array.from(dates).sort().reverse();
+            };
+
+            if (!isCloudReady) {
+                return (
+                    <div className="fixed inset-0 flex flex-col items-center justify-center bg-slate-900 text-white p-6">
+                        <div className="w-12 h-12 border-4 border-blue-600 border-t-red-600 rounded-full animate-spin mb-4"></div>
+                        <h1 className="text-xl font-black italic uppercase tracking-tighter">Loading App...</h1>
+                    </div>
+                );
+            }
+
+            const trackerData = calculateTallies(viewAllPitchers ? (sprayData[team]?.[batter]||[]) : (sprayData[team]?.[batter]||[]).filter(h=>h.pitcher===pitcher));
+            const analyticsData = calculateTallies(getAggHits());
+
+            if (snapshotMode) {
+                return (
+                    <div className="fixed inset-0 z-[100] bg-white overflow-y-auto p-4 sm:p-6">
+                        <div className="max-w-[800px] mx-auto space-y-4">
+                            <div className="flex items-center justify-between border-b-2 border-blue-700 pb-3">
+                                <h2 className="text-lg sm:text-xl font-black uppercase italic text-blue-700">Cubs Report</h2>
+                                <button onClick={() => setSnapshotMode(false)} className="bg-red-600 text-white px-3 py-1 sm:px-4 sm:py-1.5 rounded-lg font-black uppercase text-[10px]">Close</button>
+                            </div>
+                            <div className="flex flex-wrap gap-2 text-[9px] sm:text-[10px] font-black uppercase text-slate-500 mb-2">
+                                <span className="bg-slate-100 px-2 py-1 rounded">Date: {anaDate}</span>
+                                <span className="bg-slate-100 px-2 py-1 rounded">Pitcher: {anaPitcher}</span>
+                                <span className="bg-slate-100 px-2 py-1 rounded">Team: {anaTeam}</span>
+                                <span className="bg-slate-100 px-2 py-1 rounded">Batter: {anaBatter}</span>
+                            </div>
+                            <ResultsBar stats={analyticsData.stats} bipCount={analyticsData.contact.length} totalAB={analyticsData.totalAB} hitsCount={analyticsData.hitsCount} isSnapshot={true} />
+                            <div className="flex flex-col sm:grid sm:grid-cols-2 gap-4 sm:gap-6">
+                                <div className="bg-slate-800 rounded-xl overflow-hidden border-4 border-slate-200 shadow-lg">
+                                    <SVGField hits={analyticsData.contact} interactive={false} idPrefix="snap" />
+                                </div>
+                                <div className="space-y-3 bg-slate-50 p-3 sm:p-4 rounded-2xl sm:rounded-3xl border">
+                                    {['Grounder', 'Line Drive', 'Fly Ball', 'Bunt'].map(t => (
+                                        <div key={t} className="flex justify-between items-center bg-white px-3 py-2 rounded-lg border shadow-sm">
+                                            <span className="text-[10px] font-black uppercase text-slate-500">{t}s</span>
+                                            <span className="text-sm font-black">{analyticsData.stats[t]}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="fixed inset-0 flex flex-col bg-slate-100 font-sans text-slate-900">
+                    
+                    {toast.show && (
+                        <div className={`fixed top-16 left-1/2 transform -translate-x-1/2 z-[300] px-5 py-2.5 rounded-full font-black text-[11px] uppercase shadow-xl border ${toast.type === 'error' ? 'bg-red-600 border-red-800 text-white' : 'bg-green-600 border-green-800 text-white'}`}>
+                            {toast.msg}
+                        </div>
+                    )}
+
+                    {showStatEditor && !isViewMode && (
+                        <div className="fixed inset-0 z-[200] bg-slate-900/60 flex items-center justify-center p-4 backdrop-blur-sm overflow-y-auto">
+                            <div className="bg-white rounded-2xl w-full max-w-sm p-5 shadow-2xl my-4">
+                                <div className="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
+                                    <div>
+                                        <h2 className="font-black text-lg text-slate-800 uppercase tracking-tighter leading-none">Edit Stats</h2>
+                                        <p className="text-[9px] font-bold text-blue-600 uppercase mt-1">{team} - {batter}</p>
+                                    </div>
+                                    <button onClick={() => setShowStatEditor(false)} className="text-slate-400 hover:text-slate-700 bg-slate-100 p-2 rounded-full"><Icon name="x" className="w-5 h-5"/></button>
+                                </div>
+                                <p className="text-[10px] text-slate-500 font-medium mb-4 leading-tight">
+                                    Manually override stats for this batter. Hits added here are tabulated but <b>hidden</b> on the visual spray chart.
+                                </p>
+                                <div className="grid grid-cols-2 gap-3 mb-4">
+                                    {[...Object.values(OUTCOMES), ...Object.keys(COLORS)].map(statKey => (
+                                        <div key={statKey} className="flex flex-col items-center bg-slate-50 p-2 rounded-xl border border-slate-200">
+                                            <span className="text-[9px] font-black uppercase text-slate-500 mb-2 text-center h-4">{OUTCOME_LABELS[statKey] || statKey}</span>
+                                            <div className="flex items-center gap-3">
+                                                <button onClick={() => adjustStat(statKey, -1)} className="w-7 h-7 bg-white border border-slate-300 rounded-full flex items-center justify-center text-slate-600 active:bg-slate-200 shadow-sm"><Icon name="minus" className="w-3 h-3"/></button>
+                                                <span className="font-black text-lg w-4 text-center">{trackerData.stats[statKey] || 0}</span>
+                                                <button onClick={() => adjustStat(statKey, 1)} className="w-7 h-7 bg-blue-600 text-white rounded-full flex items-center justify-center active:bg-blue-800 shadow-sm"><Icon name="plus" className="w-3 h-3"/></button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                                <button onClick={() => setShowStatEditor(false)} className="w-full bg-slate-800 text-white font-black uppercase text-[11px] py-3.5 rounded-xl active:scale-95 shadow-md">Done</button>
+                            </div>
+                        </div>
+                    )}
+
+                    {showDataModal && (
+                        <div className="fixed inset-0 z-[200] bg-slate-900/60 flex items-center justify-center p-4 backdrop-blur-sm">
+                            <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl">
+                                <div className="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
+                                    <h2 className="font-black text-lg text-slate-800 uppercase tracking-tighter">Data Control</h2>
+                                    <button onClick={() => setShowDataModal(false)} className="text-slate-400 hover:text-slate-700"><Icon name="x" className="w-6 h-6"/></button>
+                                </div>
+                                <p className="text-xs text-slate-500 font-medium mb-6">
+                                    {cloudStatus === 'Live Sync' 
+                                        ? "Your data is actively syncing to the live cloud database! You can also export a physical backup file below." 
+                                        : "Your data is currently saved in the browser's temporary memory. Download a backup file regularly to save your charts to this device!"}
+                                </p>
+                                <div className="space-y-3">
+                                    <button onClick={() => {
+                                        const dataStr = JSON.stringify({ sprayData, myPitchers });
+                                        const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+                                        const exportFileDefaultName = `cubs_backup_${new Date().toISOString().slice(0,10)}.json`;
+                                        const linkElement = document.createElement('a');
+                                        linkElement.setAttribute('href', dataUri);
+                                        linkElement.setAttribute('download', exportFileDefaultName);
+                                        linkElement.click();
+                                        setShowDataModal(false);
+                                    }} className="w-full bg-blue-600 text-white font-black uppercase text-[11px] py-3.5 rounded-xl flex items-center justify-center gap-2 active:scale-95 shadow-md">
+                                        <Icon name="download" className="w-4 h-4"/> Download Backup File
+                                    </button>
+                                    
+                                    {!isViewMode && (
+                                        <label className="w-full bg-slate-100 text-slate-700 font-black uppercase text-[11px] py-3.5 rounded-xl flex items-center justify-center gap-2 border-2 border-slate-200 cursor-pointer active:scale-95">
+                                            <Icon name="upload" className="w-4 h-4"/> Restore from Backup
+                                            <input type="file" accept=".json" className="hidden" onChange={(e) => {
+                                                const file = e.target.files[0];
+                                                if (!file) return;
+                                                const reader = new FileReader();
+                                                reader.onload = (event) => {
+                                                    try {
+                                                        const data = JSON.parse(event.target.result);
+                                                        saveState(data.sprayData || sprayData, data.myPitchers || myPitchers);
+                                                        showToast('Backup successfully restored!', 'success');
+                                                        setShowDataModal(false);
+                                                    } catch (err) {
+                                                        showToast('Error importing data. Corrupted file.', 'error');
+                                                    }
+                                                };
+                                                reader.readAsText(file);
+                                            }} />
+                                        </label>
+                                    )}
+                                </div>
+                                {!isViewMode && (
+                                    <div className="pt-6 mt-6 border-t border-slate-100">
+                                        {confirmDeleteAll ? (
+                                            <div className="bg-red-50 p-3 rounded-lg border border-red-200 text-center">
+                                                <p className="text-red-700 font-bold text-[10px] uppercase mb-2">Wipe ALL Cloud Data?</p>
+                                                <div className="flex gap-2 justify-center">
+                                                    <button onClick={() => { saveState({}, []); setShowDataModal(false); setConfirmDeleteAll(false); showToast('All data erased from Cloud', 'success'); }} className="flex-1 bg-red-600 text-white py-2 rounded font-black text-[10px] uppercase shadow-sm">Yes, Delete</button>
+                                                    <button onClick={() => setConfirmDeleteAll(false)} className="flex-1 bg-slate-300 text-slate-800 py-2 rounded font-black text-[10px] uppercase shadow-sm">Cancel</button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <button onClick={() => setConfirmDeleteAll(true)} className="w-full text-red-600 font-black uppercase text-[10px] py-2 hover:bg-red-50 rounded-lg transition-colors">
+                                                ⚠️ Erase All App Data
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    <header className="bg-blue-700 text-white h-14 flex items-center px-2 sm:px-4 shrink-0 border-b-4 border-red-600 shadow-md z-20">
+                        <div className="flex items-center gap-1 sm:gap-2">
+                            <div className="w-8 h-8 sm:w-9 sm:h-9 bg-white rounded-full flex items-center justify-center shadow-inner border border-blue-800 overflow-hidden shrink-0">
+                                {!logoError ? (
+                                  <img src="cubs.png" alt="CUBS" className="w-full h-full object-contain rounded-full" onError={() => setLogoError(true)} />
+                                ) : (
+                                  <div className="font-black text-blue-700 text-[6px] sm:text-[7px]">CUBS</div>
+                                )}
+                            </div>
+                            <div className="flex flex-col justify-center">
+                                <h1 className="text-sm sm:text-lg font-black italic uppercase tracking-tighter leading-none">Spray Tracker</h1>
+                                <span className="hidden sm:inline-block text-[7px] font-bold text-blue-200 uppercase tracking-widest mt-0.5">by Cubs Analytics</span>
+                            </div>
+                        </div>
+                        <div className="flex ml-auto items-center gap-1 sm:gap-2">
+                            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 bg-slate-900/30 rounded-full border border-blue-800/50">
+                                <div className={`w-2 h-2 rounded-full ${cloudStatus === 'Live Sync' ? 'bg-green-400 animate-pulse shadow-[0_0_8px_rgba(74,222,128,0.8)]' : cloudStatus === 'Saving...' ? 'bg-yellow-400' : 'bg-slate-400'}`}></div>
+                                <span className="text-[8px] font-black uppercase tracking-widest whitespace-nowrap text-white">{cloudStatus}</span>
+                            </div>
+                            <div className="flex bg-blue-800/50 p-1 rounded-lg gap-0.5 overflow-x-auto scrollbar-hide">
+                                <button onClick={() => setIsViewMode(!isViewMode)} className={`px-2 sm:px-3 py-1.5 rounded-md text-[9px] sm:text-[10px] font-black uppercase flex items-center gap-1 shrink-0 transition-colors shadow-sm ${isViewMode ? 'bg-amber-400 text-amber-950' : 'bg-emerald-500 text-white'}`}>
+                                    <Icon name={isViewMode ? 'lock' : 'unlock'} className="w-3 h-3"/> <span className="hidden sm:inline">{isViewMode ? 'View Mode' : 'Edit Mode'}</span>
+                                </button>
+                                <button onClick={() => setActiveTab('tracker')} className={`px-2.5 sm:px-4 py-1.5 rounded-md text-[9px] sm:text-[10px] font-black uppercase ${activeTab === 'tracker' ? 'bg-red-600 shadow-sm' : ''}`}>Tracker</button>
+                                <button onClick={() => setActiveTab('analytics')} className={`px-2.5 sm:px-4 py-1.5 rounded-md text-[9px] sm:text-[10px] font-black uppercase ${activeTab === 'analytics' ? 'bg-blue-900 shadow-sm' : ''}`}>Analytics</button>
+                                <button onClick={() => setShowDataModal(true)} className="px-2 sm:px-3 py-1.5 rounded-md text-[9px] sm:text-[10px] font-black uppercase text-blue-100 hover:bg-blue-700 flex items-center gap-1 shrink-0"><Icon name="save" className="w-3 h-3"/> <span className="hidden sm:inline">Data</span></button>
+                            </div>
+                        </div>
+                    </header>
+
+                    <main className="flex-1 flex flex-col lg:flex-row gap-2 p-2 min-h-0 overflow-y-auto lg:overflow-hidden">
+                        
+                        {/* SETUP COLUMN (Tracker Only) */}
+                        {activeTab === 'tracker' && (
+                            <aside className="order-3 lg:order-1 w-full lg:w-56 grid grid-cols-1 sm:grid-cols-3 lg:flex lg:flex-col gap-2 shrink-0 lg:overflow-y-auto scrollbar-hide lg:pb-4">
+                                <div className="bg-white p-2.5 rounded-xl border shadow-sm shrink-0 flex items-center gap-2 sm:col-span-3 lg:col-auto">
+                                    <Icon name="calendar" className="w-4 h-4 text-blue-600 shrink-0"/>
+                                    <input type="date" value={gameDate} onChange={e => setGameDate(e.target.value)} disabled={isViewMode} className="w-full text-[11px] font-black outline-none text-slate-700 bg-transparent cursor-pointer disabled:opacity-50" />
+                                </div>
+                                <div className="bg-white p-3 rounded-xl border shadow-sm shrink-0">
+                                    <div className="flex justify-between items-center mb-1">
+                                        <label className="text-[8px] font-black text-slate-400 uppercase">1. Team</label>
+                                        {team && !editingTeam && !teamDelConfirm && !isViewMode && (
+                                            <div className="flex gap-1.5">
+                                                <button onClick={() => { setEditTeamName(team); setEditingTeam(true); }} className="text-blue-500 hover:text-blue-700"><Icon name="edit" className="w-3.5 h-3.5"/></button>
+                                                <button onClick={() => setTeamDelConfirm(true)} className="text-red-500 hover:text-red-700"><Icon name="trash" className="w-3.5 h-3.5"/></button>
+                                            </div>
+                                        )}
+                                    </div>
+                                    {editingTeam ? (
+                                        <div className="flex gap-1 mb-1">
+                                            <input value={editTeamName} onChange={e=>setEditTeamName(e.target.value)} className="flex-1 p-1.5 text-[11px] font-bold border border-blue-400 rounded outline-none" />
+                                            <button onClick={handleEditTeam} className="bg-green-500 text-white px-2 rounded shadow-sm"><Icon name="save" className="w-3.5 h-3.5"/></button>
+                                            <button onClick={() => setEditingTeam(false)} className="bg-slate-400 text-white px-2 rounded shadow-sm"><Icon name="x" className="w-3.5 h-3.5"/></button>
+                                        </div>
+                                    ) : teamDelConfirm ? (
+                                        <div className="flex flex-col gap-1.5 mb-1 bg-red-50 p-2 rounded border border-red-200">
+                                            <span className="text-[9px] font-black text-red-700 text-center uppercase tracking-tighter">Delete {team}?</span>
+                                            <div className="flex gap-1">
+                                                <button onClick={handleDeleteTeam} className="flex-1 bg-red-600 text-white py-1 rounded text-[10px] font-bold shadow-sm">Yes</button>
+                                                <button onClick={() => setTeamDelConfirm(false)} className="flex-1 bg-slate-400 text-white py-1 rounded text-[10px] font-bold shadow-sm">No</button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <Fragment>
+                                            <select value={team} onChange={e => {setTeam(e.target.value); setBatter('');}} className="w-full p-2 bg-slate-50 border rounded-lg text-[11px] font-black mb-1 outline-none">
+                                                <option value="">Select Team...</option>{Object.keys(sprayData).map(t => <option key={t} value={t}>{t}</option>)}
+                                            </select>
+                                            {!isViewMode && (
+                                                <form onSubmit={e => {e.preventDefault(); if(newT && !sprayData[newT]) { const next = {...sprayData, [newT]: {}}; saveState(next, null); setTeam(newT); setNewT('');}}} className="flex gap-1 mt-1">
+                                                    <input type="text" value={newT} onChange={e=>setNewT(e.target.value)} placeholder="New Team..." className="flex-1 p-1.5 text-[10px] border rounded outline-none focus:border-blue-500" /><button className="bg-blue-800 text-white px-2 rounded">+</button>
+                                                </form>
+                                            )}
+                                        </Fragment>
+                                    )}
+                                </div>
+
+                                <div className="bg-white p-3 rounded-xl border shadow-sm shrink-0">
+                                    <div className="flex justify-between items-center mb-1">
+                                        <label className="text-[8px] font-black text-slate-400 uppercase">2. Batter</label>
+                                        {batter && !editingBatter && !batterDelConfirm && !isViewMode && (
+                                            <div className="flex gap-1.5">
+                                                <button onClick={() => { setEditBatterName(batter); setEditingBatter(true); }} className="text-blue-500 hover:text-blue-700"><Icon name="edit" className="w-3.5 h-3.5"/></button>
+                                                <button onClick={() => setBatterDelConfirm(true)} className="text-red-500 hover:text-red-700"><Icon name="trash" className="w-3.5 h-3.5"/></button>
+                                            </div>
+                                        )}
+                                    </div>
+                                    {team ? (
+                                        editingBatter ? (
+                                            <div className="flex gap-1 mb-1">
+                                                <input value={editBatterName} onChange={e=>setEditBatterName(e.target.value)} className="flex-1 p-1.5 text-[11px] font-bold border border-blue-400 rounded outline-none" />
+                                                <button onClick={handleEditBatter} className="bg-green-500 text-white px-2 rounded shadow-sm"><Icon name="save" className="w-3.5 h-3.5"/></button>
+                                                <button onClick={() => setEditingBatter(false)} className="bg-slate-400 text-white px-2 rounded shadow-sm"><Icon name="x" className="w-3.5 h-3.5"/></button>
+                                            </div>
+                                        ) : batterDelConfirm ? (
+                                            <div className="flex flex-col gap-1.5 mb-1 bg-red-50 p-2 rounded border border-red-200">
+                                                <span className="text-[9px] font-black text-red-700 text-center uppercase tracking-tighter">Delete {batter}?</span>
+                                                <div className="flex gap-1">
+                                                    <button onClick={handleDeleteBatter} className="flex-1 bg-red-600 text-white py-1 rounded text-[10px] font-bold shadow-sm">Yes</button>
+                                                    <button onClick={() => setBatterDelConfirm(false)} className="flex-1 bg-slate-400 text-white py-1 rounded text-[10px] font-bold shadow-sm">No</button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <Fragment>
+                                                <select value={batter} onChange={e => setBatter(e.target.value)} className="w-full p-2 bg-slate-50 border rounded-lg text-[11px] font-black mb-1 outline-none">
+                                                    <option value="">Select Batter...</option>{Object.keys(sprayData[team]||{}).map(b => <option key={b} value={b}>{b}</option>)}
+                                                </select>
+                                                {!isViewMode && (
+                                                    <form onSubmit={e => {e.preventDefault(); if(newB && !sprayData[team][newB]) { const next = {...sprayData, [team]: {...sprayData[team], [newB]: []}}; saveState(next, null); setBatter(newB); setNewB('');}}} className="flex gap-1 mt-1">
+                                                        <input type="text" value={newB} onChange={e=>setNewB(e.target.value)} placeholder="New Batter..." className="flex-1 p-1.5 text-[10px] border rounded outline-none focus:border-blue-500" /><button className="bg-blue-800 text-white px-2 rounded">+</button>
+                                                    </form>
+                                                )}
+                                            </Fragment>
+                                        )
+                                    ) : (
+                                        <p className="text-[10px] text-slate-400 font-bold">Select a team first</p>
+                                    )}
+                                </div>
+
+                                <div className="bg-blue-800 p-3 rounded-xl shadow-lg shrink-0 text-white">
+                                    <div className="flex justify-between items-center mb-1">
+                                        <label className="text-[8px] font-black text-red-300 uppercase">3. Our Pitcher</label>
+                                        {pitcher && !editingPitcher && !pitcherDelConfirm && !isViewMode && (
+                                            <div className="flex gap-1.5">
+                                                <button onClick={() => { setEditPitcherName(pitcher); setEditingPitcher(true); }} className="text-blue-300 hover:text-white"><Icon name="edit" className="w-3.5 h-3.5"/></button>
+                                                <button onClick={() => setPitcherDelConfirm(true)} className="text-red-400 hover:text-red-300"><Icon name="trash" className="w-3.5 h-3.5"/></button>
+                                            </div>
+                                        )}
+                                    </div>
+                                    {editingPitcher ? (
+                                        <div className="flex gap-1 mb-1">
+                                            <input value={editPitcherName} onChange={e=>setEditPitcherName(e.target.value)} className="flex-1 p-1.5 text-[11px] font-bold border border-blue-400 bg-blue-900 text-white rounded outline-none" />
+                                            <button onClick={handleEditPitcher} className="bg-green-500 text-white px-2 rounded shadow-sm"><Icon name="save" className="w-3.5 h-3.5"/></button>
+                                            <button onClick={() => setEditingPitcher(false)} className="bg-slate-400 text-white px-2 rounded shadow-sm"><Icon name="x" className="w-3.5 h-3.5"/></button>
+                                        </div>
+                                    ) : pitcherDelConfirm ? (
+                                        <div className="flex flex-col gap-1.5 mb-1 bg-red-900/50 p-2 rounded border border-red-500">
+                                            <span className="text-[9px] font-black text-red-200 text-center uppercase tracking-tighter">Delete {pitcher}?</span>
+                                            <div className="flex gap-1">
+                                                <button onClick={handleDeletePitcher} className="flex-1 bg-red-600 text-white py-1 rounded text-[10px] font-bold shadow-sm">Yes</button>
+                                                <button onClick={() => setPitcherDelConfirm(false)} className="flex-1 bg-slate-500 text-white py-1 rounded text-[10px] font-bold shadow-sm">No</button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <Fragment>
+                                            <select value={pitcher} onChange={e => setPitcher(e.target.value)} className={`w-full p-2 border rounded-lg text-[11px] font-black outline-none ${pitcher ? 'bg-blue-600' : 'bg-white text-blue-900'}`}>
+                                                <option value="">Select Pitcher</option>{myPitchers.map(p => <option key={p} value={p}>{p}</option>)}
+                                            </select>
+                                            {!isViewMode && (
+                                                <form onSubmit={e => {e.preventDefault(); if(newP && !myPitchers.includes(newP)) { const next = [...myPitchers, newP]; saveState(null, next); setPitcher(newP); setNewP('');}}} className="flex gap-1 mt-2">
+                                                    <input type="text" value={newP} onChange={e=>setNewP(e.target.value)} placeholder="Add Pitcher..." className="flex-1 p-1.5 text-[10px] bg-blue-900/40 border-blue-600 border rounded text-white outline-none focus:bg-blue-900" /><button className="bg-red-600 px-2 rounded">+</button>
+                                                </form>
+                                            )}
+                                        </Fragment>
+                                    )}
+                                </div>
+                            </aside>
+                        )}
+
+                        {/* ANALYTICS FILTERS COLUMN */}
+                        {activeTab === 'analytics' && (
+                            <aside className="order-1 lg:order-1 w-full lg:w-56 flex flex-col sm:grid sm:grid-cols-2 lg:flex lg:flex-col gap-2 shrink-0 lg:overflow-y-auto scrollbar-hide lg:pb-4">
+                                <div className="bg-white p-3 rounded-xl border shadow-sm shrink-0 sm:col-span-2 lg:col-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-3">
+                                    <div>
+                                        <label className="text-[8px] font-black text-slate-400 uppercase mb-1 block">Date Filter</label>
+                                        <select value={anaDate} onChange={e=>setAnaDate(e.target.value)} className="w-full p-2 border rounded-lg font-bold text-[10px] outline-none bg-slate-50"><option value="ALL">All Dates</option>{getAllDates().map(d=><option key={d} value={d}>{d}</option>)}</select>
+                                    </div>
+                                    <div>
+                                        <label className="text-[8px] font-black text-slate-400 uppercase mb-1 block">Our Pitcher Filter</label>
+                                        <select value={anaPitcher} onChange={e=>setAnaPitcher(e.target.value)} className="w-full p-2 border-2 border-blue-200 bg-blue-50 text-blue-800 rounded-lg font-black text-[11px] outline-none"><option value="ALL">All Our Pitchers</option>{myPitchers.map(p=><option key={p} value={p}>{p}</option>)}</select>
+                                    </div>
+                                    <div>
+                                        <label className="text-[8px] font-black text-slate-400 uppercase mb-1 block">Opponent Team Filter</label>
+                                        <select value={anaTeam} onChange={e=>{setAnaTeam(e.target.value); setAnaBatter('ALL');}} className="w-full p-2 border-2 border-red-200 bg-red-50 text-red-800 rounded-lg font-black text-[11px] outline-none"><option value="ALL">All Opponents</option>{Object.keys(sprayData).map(t=><option key={t} value={t}>{t}</option>)}</select>
+                                    </div>
+                                    <div>
+                                        <label className="text-[8px] font-black text-slate-400 uppercase mb-1 block">Opponent Batter Filter</label>
+                                        <select value={anaBatter} disabled={anaTeam === 'ALL'} onChange={e=>setAnaBatter(e.target.value)} className="w-full p-2 border rounded-lg font-bold text-[10px] outline-none disabled:opacity-50"><option value="ALL">{anaTeam === 'ALL' ? 'Select Team First' : 'All Batters in Team'}</option>{anaTeam !== 'ALL' && Object.keys(sprayData[anaTeam]||{}).map(b=><option key={b} value={b}>{b}</option>)}</select>
+                                    </div>
+                                </div>
+                                <button onClick={()=>setSnapshotMode(true)} className="bg-slate-800 text-white w-full py-3 rounded-xl shrink-0 font-black text-[10px] uppercase flex items-center justify-center gap-2 active:bg-black shadow-lg sm:col-span-2 lg:col-auto"><Icon name="camera" className="w-3.5 h-3.5"/> Snapshot Report</button>
+                            </aside>
+                        )}
+
+                        {/* FIELD SECTION */}
+                        <section className={`order-1 lg:order-2 w-full lg:flex-1 bg-white rounded-2xl border shadow-sm flex flex-col overflow-visible lg:overflow-hidden min-w-0 shrink-0 lg:shrink ${activeTab === 'tracker' ? 'mt-0' : ''}`}>
+                            {activeTab === 'tracker' && team && batter && <ResultsBar stats={trackerData.stats} bipCount={trackerData.contact.length} totalAB={trackerData.totalAB} hitsCount={trackerData.hitsCount} onEditClick={!isViewMode ? () => setShowStatEditor(true) : null} isViewMode={isViewMode} />}
+                            {activeTab === 'analytics' && <ResultsBar stats={analyticsData.stats} bipCount={analyticsData.contact.length} totalAB={analyticsData.totalAB} hitsCount={analyticsData.hitsCount} isViewMode={true} />}
+                            
+                            <div className="flex-1 relative flex items-center justify-center p-2 lg:p-4 bg-slate-100/50 rounded-b-2xl lg:rounded-none">
+                                {activeTab==='tracker' ? (!team||!batter ? <Icon name="target" className="w-12 h-12 opacity-10 text-slate-400" /> : (
+                                    <div className="w-full h-auto aspect-[1.5/1] lg:h-full lg:max-h-full bg-slate-800 rounded-xl relative shadow-2xl overflow-hidden border-[4px] sm:border-[6px] border-slate-700 max-w-[1000px]">
+                                        <SVGField hits={trackerData.contact} interactive={!isViewMode} clickHandler={plotContact} refProps={svgRefTracker} idPrefix="tracker" />
+                                    </div>
+                                )) : (
+                                    <div className="w-full h-auto aspect-[1.5/1] lg:h-full lg:max-h-full bg-slate-800 rounded-xl relative shadow-xl overflow-hidden border-[4px] sm:border-[6px] border-slate-700 max-w-[1000px]">
+                                        <SVGField hits={analyticsData.contact} interactive={false} idPrefix="analytics" />
+                                    </div>
+                                )}
+                                {!isViewMode && activeTab==='tracker' && team && batter && (
+                                    <div className="absolute bottom-4 right-4 flex gap-1 items-end">
+                                        <button onClick={undo} className="bg-white/95 px-3 py-1.5 rounded-lg font-black text-[9px] uppercase shadow-md border active:scale-95 flex items-center gap-1"><Icon name="rotate" className="w-2.5 h-2.5"/> Undo</button>
+                                        {clearConfirm ? (
+                                            <div className="flex flex-col items-center gap-1.5 bg-red-50 p-2 rounded-lg shadow-xl border-2 border-red-400 transform origin-bottom-right transition-all animate-in zoom-in-95">
+                                                <span className="text-[10px] font-black text-red-700 uppercase tracking-tighter px-1">Clear chart for {batter}?</span>
+                                                <div className="flex gap-1 w-full">
+                                                    <button onClick={() => { const next = {...sprayData}; next[team][batter] = []; saveState(next, null); setClearConfirm(false); showToast(`Cleared chart for ${batter}`, 'success'); }} className="flex-1 bg-red-600 text-white px-3 py-1.5 text-[9px] font-black rounded uppercase active:scale-95">Yes</button>
+                                                    <button onClick={() => setClearConfirm(false)} className="flex-1 bg-slate-500 text-white px-3 py-1.5 text-[9px] font-black rounded uppercase active:scale-95">Cancel</button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <button onClick={() => setClearConfirm(true)} className="bg-white/95 text-red-600 px-3 py-1.5 rounded-lg font-black text-[9px] uppercase shadow-md border border-red-100 hover:bg-red-50 active:scale-95 flex items-center gap-1"><Icon name="trash" className="w-2.5 h-2.5" /> Clear</button>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        </section>
+
+                        {/* LOGS/OUTCOMES COLUMN (Tracker Only) */}
+                        {activeTab==='tracker' && (
+                            <aside className="order-2 lg:order-3 w-full lg:w-56 grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-col gap-2 shrink-0 lg:overflow-y-auto scrollbar-hide lg:pb-4">
+                                <div className="bg-white p-3 rounded-xl border shadow-sm shrink-0"><h3 className="text-[9px] font-black uppercase text-slate-700 mb-2">Contact Log</h3>
+                                    <div className="grid grid-cols-2 gap-1.5 mb-2">{Object.entries(COLORS).map(([n,c])=>(<button key={n} disabled={isViewMode} onClick={()=>setHitType(n)} className={`py-2 px-1 rounded-lg border text-[10px] font-black uppercase flex items-center justify-center sm:justify-start gap-1 outline-none disabled:opacity-50 disabled:grayscale ${hitType===n?'bg-blue-50 border-blue-500 text-blue-700':'bg-white text-slate-500'}`}><div className="w-2 h-2 rounded-full shrink-0" style={{backgroundColor:c}}/><span className="hidden sm:inline">{n}</span><span className="sm:hidden">{n.split(' ')[0]}</span></button>))}</div>
+                                    <div className="flex gap-1 pt-2 border-t border-slate-50">{['Weak','Solid','Hard'].map(q=>(<button key={q} disabled={isViewMode} onClick={()=>setQuality(q)} className={`flex-1 py-1.5 rounded border text-[9px] font-black uppercase outline-none disabled:opacity-50 disabled:grayscale ${quality===q?'bg-blue-600 border-blue-600 text-white shadow-md':'bg-slate-50 text-slate-400'}`}>{q}</button>))}</div>
+                                </div>
+                                
+                                <div className="bg-white p-3 rounded-xl border shadow-sm shrink-0">
+                                    <h3 className="text-[9px] font-black uppercase text-slate-700 mb-2">Plate Appearances</h3>
+                                    <div className="grid grid-cols-2 gap-1.5">
+                                        <button disabled={isViewMode} onClick={()=>{if(!pitcher){showToast('Please select Our Pitcher!');return;} addOutcome({ type: OUTCOMES.WALK, pitcher, isContact: false })}} className="py-2.5 bg-blue-50 border-blue-200 border rounded-lg font-black text-[11px] text-blue-800 active:scale-95 outline-none disabled:opacity-50 disabled:grayscale">BB</button>
+                                        <button disabled={isViewMode} onClick={()=>{if(!pitcher){showToast('Please select Our Pitcher!');return;} addOutcome({ type: OUTCOMES.HBP, pitcher, isContact: false })}} className="py-2.5 bg-blue-50 border-blue-200 border rounded-lg font-black text-[11px] text-blue-800 active:scale-95 outline-none disabled:opacity-50 disabled:grayscale">HBP</button>
+                                        <button disabled={isViewMode} onClick={()=>{if(!pitcher){showToast('Please select Our Pitcher!');return;} addOutcome({ type: OUTCOMES.K_SWING, pitcher, isContact: false })}} className="py-2.5 bg-red-50 border-red-200 border rounded-lg font-black text-[11px] text-red-800 active:scale-95 outline-none disabled:opacity-50 disabled:grayscale">K</button>
+                                        <button disabled={isViewMode} onClick={()=>{if(!pitcher){showToast('Please select Our Pitcher!');return;} addOutcome({ type: OUTCOMES.K_LOOK, pitcher, isContact: false })}} className="py-2.5 bg-red-50 border-red-200 border rounded-lg font-black text-[11px] text-red-800 active:scale-95 outline-none disabled:opacity-50 disabled:grayscale">ꓘ</button>
+                                    </div>
+
+                                    <h3 className="text-[9px] font-black uppercase text-slate-700 mt-4 mb-2">Play Outcomes</h3>
+                                    <div className="grid grid-cols-3 gap-1.5">
+                                        <button disabled={isViewMode} onClick={()=>{if(!pitcher){showToast('Please select Our Pitcher!');return;} addOutcome({ type: OUTCOMES.SINGLE, pitcher, isContact: false })}} className="py-2 bg-slate-50 border border-slate-200 rounded text-[10px] font-black active:scale-95 outline-none disabled:opacity-50 disabled:grayscale text-slate-800 hover:bg-slate-100">1B</button>
+                                        <button disabled={isViewMode} onClick={()=>{if(!pitcher){showToast('Please select Our Pitcher!');return;} addOutcome({ type: OUTCOMES.DOUBLE, pitcher, isContact: false })}} className="py-2 bg-slate-50 border border-slate-200 rounded text-[10px] font-black active:scale-95 outline-none disabled:opacity-50 disabled:grayscale text-slate-800 hover:bg-slate-100">2B</button>
+                                        <button disabled={isViewMode} onClick={()=>{if(!pitcher){showToast('Please select Our Pitcher!');return;} addOutcome({ type: OUTCOMES.TRIPLE, pitcher, isContact: false })}} className="py-2 bg-slate-50 border border-slate-200 rounded text-[10px] font-black active:scale-95 outline-none disabled:opacity-50 disabled:grayscale text-slate-800 hover:bg-slate-100">3B</button>
+                                        <button disabled={isViewMode} onClick={()=>{if(!pitcher){showToast('Please select Our Pitcher!');return;} addOutcome({ type: OUTCOMES.HR, pitcher, isContact: false })}} className="py-2 bg-slate-50 border border-slate-200 rounded text-[10px] font-black active:scale-95 outline-none disabled:opacity-50 disabled:grayscale text-slate-800 hover:bg-slate-100">HR</button>
+                                        <button disabled={isViewMode} onClick={()=>{if(!pitcher){showToast('Please select Our Pitcher!');return;} addOutcome({ type: OUTCOMES.ROE, pitcher, isContact: false })}} className="py-2 bg-orange-50 border border-orange-200 rounded text-[10px] font-black active:scale-95 outline-none disabled:opacity-50 disabled:grayscale text-orange-800 hover:bg-orange-100">ROE</button>
+                                        <button disabled={isViewMode} onClick={()=>{if(!pitcher){showToast('Please select Our Pitcher!');return;} addOutcome({ type: OUTCOMES.OUT, pitcher, isContact: false })}} className="py-2 bg-slate-100 border border-slate-300 rounded text-[10px] font-black active:scale-95 outline-none disabled:opacity-50 disabled:grayscale text-slate-800 hover:bg-slate-200">OUT</button>
+                                    </div>
+                                </div>
+                            </aside>
+                        )}
+                    </main>
+                </div>
+            );
+        }
+        
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
