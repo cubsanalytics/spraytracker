@@ -83,7 +83,12 @@
             const allHits = pendingHit ? [...hits, pendingHit] : hits;
             return (
                 <svg ref={refProps} viewBox="0 0 155 100" preserveAspectRatio="xMidYMid meet" className={`w-full h-full drop-shadow-2xl ${interactive ? 'cursor-crosshair' : ''}`} onClick={interactive ? clickHandler : undefined}>
-                    <image href="IMG_0664.jpg" x="0" y="0" width="155" height="100" preserveAspectRatio="none" />
+                    {/* Fallback green background so you never see a black box while loading */}
+                    <rect width="155" height="100" fill="#15803d" />
+                    
+                    {/* Ultra-compatible image tag for all versions of iOS/Safari */}
+                    <image href="./IMG_0664.jpg" xlinkHref="./IMG_0664.jpg" x="0" y="0" width="155" height="100" preserveAspectRatio="none" />
+                    
                     {allHits.map(hit => {
                         if (hit.isManual) return null;
                         const isPending = hit.id === 'pending';
