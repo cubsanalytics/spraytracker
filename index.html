@@ -82,13 +82,19 @@
         const SVGField = ({ hits, pendingHit, interactive, clickHandler, refProps, idPrefix = "f1" }) => {
             const allHits = pendingHit ? [...hits, pendingHit] : hits;
             return (
-                <svg ref={refProps} viewBox="0 0 155 100" preserveAspectRatio="xMidYMid meet" className={`w-full h-full drop-shadow-2xl ${interactive ? 'cursor-crosshair' : ''}`} onClick={interactive ? clickHandler : undefined}>
-                    {/* Fallback green background so you never see a black box while loading */}
-                    <rect width="155" height="100" fill="#15803d" />
-                    
-                    {/* Ultra-compatible image tag for all versions of iOS/Safari */}
-                    <image href="./IMG_0664.jpg" xlinkHref="./IMG_0664.jpg" x="0" y="0" width="155" height="100" preserveAspectRatio="none" />
-                    
+                <svg 
+                    ref={refProps} 
+                    viewBox="0 0 155 100" 
+                    preserveAspectRatio="xMidYMid meet" 
+                    style={{ 
+                        backgroundImage: "url('IMG_0664.jpg?v=3')", 
+                        backgroundSize: "100% 100%", 
+                        backgroundRepeat: "no-repeat",
+                        backgroundColor: "#15803d" 
+                    }}
+                    className={`w-full h-full drop-shadow-2xl ${interactive ? 'cursor-crosshair' : ''}`} 
+                    onClick={interactive ? clickHandler : undefined}
+                >
                     {allHits.map(hit => {
                         if (hit.isManual) return null;
                         const isPending = hit.id === 'pending';
@@ -110,7 +116,7 @@
                             path = <path d={`M ${ox} ${oy} Q ${(ox+hit.x)/2+offX} ${(oy+hit.y)/2+offY} ${hit.x} ${hit.y}`} stroke={color} strokeWidth="0.75" fill="none" />;
                         }
                         
-                        if (!path) return null; // Ignore purely outcome-based hits on the map
+                        if (!path) return null;
 
                         let marker = null;
                         if (q === 'Weak') marker = <g transform={`translate(${hit.x}, ${hit.y})`}><line x1="-1.2" y1="-1.2" x2="1.2" y2="1.2" stroke={color} strokeWidth="1.2" /><line x1="1.2" y1="-1.2" x2="-1.2" y2="1.2" stroke={color} strokeWidth="1.2" /></g>;
