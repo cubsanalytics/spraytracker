@@ -35,7 +35,7 @@
             .print-hide { display: none !important; }
             .print-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.1in; align-items: start; }
             .print-card { 
-                height: 2.35in; /* 4 rows fit inside 10.5in of printable space */
+                height: 2.35in; /* 4 rows fit perfectly inside 10.5in of printable vertical space */
                 page-break-inside: avoid; 
                 break-inside: avoid; 
                 border: 1px solid #cbd5e1; 
@@ -537,6 +537,48 @@
                 return Array.from(dates).sort().reverse();
             };
 
+            // ADDED: The missing grid-drawing function that caused the crash!
+            const renderTeamReport = () => {
+                if (anaTeam === 'ALL' || anaBatter !== 'ALL') return null;
+                
+                const batters = Object.keys(sprayData[anaTeam] || {}).sort();
+                const teamReport = batters.map(b => {
+                    const bHits = (sprayData[anaTeam][b] || []).filter(h => {
+                        if (anaPitcher !== 'ALL' && h.pitcher !== anaPitcher) return false;
+                        if (anaDate !== 'ALL' && h.date !== anaDate) return false;
+                        return true;
+                    });
+                    return { batter: b, data: calculateTallies(bHits) };
+                }); // Removed the `.filter()` so ALL batters on the roster get a chart
+
+                if (teamReport.length === 0) {
+                    return (
+                        <div className="flex-1 flex items-center justify-center p-8">
+                            <p className="text-slate-400 font-bold uppercase tracking-widest text-sm text-center">No roster data for {anaTeam}.</p>
+                        </div>
+                    );
+                }
+
+                return (
+                    <div className="flex-1 overflow-y-auto p-2 lg:p-4 bg-slate-100/50 rounded-b-2xl lg:rounded-none">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                            {teamReport.map((item, idx) => (
+                                <div key={idx} className="bg-white rounded-xl overflow-hidden border-2 border-slate-200 shadow-sm flex flex-col">
+                                    <div className="bg-blue-800 text-white px-3 py-1.5 flex justify-between items-center border-b-2 border-slate-700">
+                                        <h3 className="font-black text-[11px] uppercase tracking-tighter truncate">{item.batter}</h3>
+                                        <span className="text-[9px] font-bold text-blue-200">{item.data.contact.length} BIP</span>
+                                    </div>
+                                    <div className="w-full aspect-[1.5/1] bg-slate-800 relative border-b-2 border-slate-700">
+                                        <SVGField hits={item.data.contact} interactive={false} idPrefix={`ana-team-${idx}`} />
+                                    </div>
+                                    <ResultsBar stats={item.data.stats} bipCount={item.data.contact.length} totalAB={item.data.totalAB} hitsCount={item.data.hitsCount} isViewMode={true} />
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                );
+            };
+
             if (!isCloudReady) {
                 return (
                     <div className="fixed inset-0 flex flex-col items-center justify-center bg-slate-900 text-white p-6">
@@ -923,8 +965,8 @@
 
                         {/* FIELD SECTION */}
                         <section className={`order-1 lg:order-2 w-full lg:flex-1 bg-white rounded-2xl border shadow-sm flex flex-col overflow-visible lg:overflow-hidden min-w-0 shrink-0 lg:shrink ${activeTab === 'tracker' ? 'mt-0' : ''}`}>
-                            {activeTab === 'tracker' && team && batter && <ResultsBar stats={trackerData.stats} bipCount={trackerData.contact.length} totalAB={trackerData.totalAB} onEditClick={!isViewMode ? () => setShowStatEditor(true) : null} isViewMode={isViewMode} />}
-                            {activeTab === 'analytics' && (anaTeam === 'ALL' || anaBatter !== 'ALL') && <ResultsBar stats={analyticsData.stats} bipCount={analyticsData.contact.length} totalAB={analyticsData.totalAB} isViewMode={true} />}
+                            {activeTab === 'tracker' && team && batter && <ResultsBar stats={trackerData.stats} bipCount={trackerData.contact.length} totalAB={trackerData.totalAB} hitsCount={trackerData.hitsCount} onEditClick={!isViewMode ? () => setShowStatEditor(true) : null} isViewMode={isViewMode} />}
+                            {activeTab === 'analytics' && (anaTeam === 'ALL' || anaBatter !== 'ALL') && <ResultsBar stats={analyticsData.stats} bipCount={analyticsData.contact.length} totalAB={analyticsData.totalAB} hitsCount={analyticsData.hitsCount} isViewMode={true} />}
                             
                             <div className="flex-1 relative flex flex-col min-h-0 bg-slate-100/50 rounded-b-2xl lg:rounded-none">
                                 {activeTab==='tracker' ? (
@@ -947,68 +989,71 @@
                                     )
                                 )}
                                 {!isViewMode && activeTab==='tracker' && team && batter && (
-                                        <div className="absolute bottom-4 right-4 flex gap-1 items-end">
-                                            <button onClick={undo} className="bg-white/95 px-3 py-1.5 rounded-lg font-black text-[9px] uppercase shadow-md border active:scale-95 flex items-center gap-1"><Icon name="rotate" className="w-2.5 h-2.5"/> Undo</button>
-                                            {clearConfirm ? (
-                                                <div className="flex gap-1 bg-red-50 p-1.5 rounded-lg shadow-md border border-red-200">
-                                                    <button onClick={() => { const next = {...sprayData}; next[team][batter] = []; saveState(next, null); setClearConfirm(false); showToast(`Cleared chart for ${batter}`, 'success'); }} className="bg-red-600 text-white px-3 py-1.5 text-[9px] font-black rounded uppercase active:scale-95">Yes, Clear</button>
-                                                    <button onClick={() => setClearConfirm(false)} className="bg-slate-500 text-white px-3 py-1.5 text-[9px] font-black rounded uppercase active:scale-95">No</button>
+                                    <div className="absolute bottom-4 right-4 flex gap-1 items-end">
+                                        <button onClick={undo} className="bg-white/95 px-3 py-1.5 rounded-lg font-black text-[9px] uppercase shadow-md border active:scale-95 flex items-center gap-1"><Icon name="rotate" className="w-2.5 h-2.5"/> Undo</button>
+                                        {clearConfirm ? (
+                                            <div className="flex flex-col items-center gap-1.5 bg-red-50 p-2 rounded-lg shadow-xl border-2 border-red-400 transform origin-bottom-right transition-all animate-in zoom-in-95">
+                                                <span className="text-[10px] font-black text-red-700 uppercase tracking-tighter px-1">Clear chart for {batter}?</span>
+                                                <div className="flex gap-1 w-full">
+                                                    <button onClick={() => { const next = {...sprayData}; next[team][batter] = []; saveState(next, null); setClearConfirm(false); showToast(`Cleared chart for ${batter}`, 'success'); }} className="flex-1 bg-red-600 text-white px-3 py-1.5 text-[9px] font-black rounded uppercase active:scale-95">Yes</button>
+                                                    <button onClick={() => setClearConfirm(false)} className="flex-1 bg-slate-500 text-white px-3 py-1.5 text-[9px] font-black rounded uppercase active:scale-95">Cancel</button>
                                                 </div>
-                                            ) : (
-                                                <button onClick={() => setClearConfirm(true)} className="bg-white/95 text-red-600 px-3 py-1.5 rounded-lg font-black text-[9px] uppercase shadow-md border border-red-100 hover:bg-red-50 active:scale-95 flex items-center gap-1"><Icon name="trash" className="w-2.5 h-2.5" /> Clear</button>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
-                            </section>
-
-                            {/* LOGS/OUTCOMES COLUMN (Tracker Only) */}
-                            {activeTab==='tracker' && (
-                                <aside className="w-full lg:w-56 flex flex-col gap-2 shrink-0 lg:overflow-y-auto scrollbar-hide lg:pb-4">
-                                    <div className="bg-white p-3 rounded-xl border shadow-sm shrink-0">
-                                        <h3 className="text-[9px] font-black uppercase text-slate-700 mb-2">Contact Log</h3>
-                                        <div className="flex gap-1 mb-2">
-                                            {['Weak','Solid','Hard'].map(q=>(
-                                                <button key={q} disabled={isViewMode} onClick={()=>setQuality(q)} className={`flex-1 py-1 rounded border text-[9px] font-black uppercase outline-none disabled:opacity-50 disabled:grayscale ${quality===q?'bg-blue-600 border-blue-600 text-white shadow-md':'bg-slate-50 text-slate-400'}`}>{q}</button>
-                                            ))}
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-1.5 pt-2 border-t border-slate-50">
-                                            {Object.entries(COLORS).map(([n,c])=>(
-                                                <button key={n} disabled={isViewMode} onClick={()=>setHitType(n)} className={`py-1.5 px-1 rounded-md border text-[9px] font-black uppercase flex items-center justify-center sm:justify-start gap-1 outline-none disabled:opacity-50 disabled:grayscale ${hitType===n?'bg-blue-50 border-blue-500 text-blue-700':'bg-white text-slate-500'}`}>
-                                                    <div className="w-2 h-2 rounded-full shrink-0" style={{backgroundColor:c}}/>
-                                                    <span className="hidden sm:inline">{n}</span><span className="sm:hidden">{n.split(' ')[0]}</span>
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                    
-                                    <div className="bg-white p-3 rounded-xl border shadow-sm shrink-0">
-                                        <h3 className="text-[9px] font-black uppercase text-slate-700 mb-2">Plate Appearances</h3>
-                                        <div className="grid grid-cols-2 gap-1.5">
-                                            <button disabled={isViewMode} onClick={()=>{if(!pitcher){showToast('Please select Our Pitcher!');return;} addOutcome({ type: OUTCOMES.WALK, pitcher, isContact: false }); setPendingContact(null);}} className="py-2.5 bg-blue-50 border-blue-200 border rounded-lg font-black text-[11px] text-blue-800 active:scale-95 outline-none disabled:opacity-50 disabled:grayscale">BB</button>
-                                            <button disabled={isViewMode} onClick={()=>{if(!pitcher){showToast('Please select Our Pitcher!');return;} addOutcome({ type: OUTCOMES.HBP, pitcher, isContact: false }); setPendingContact(null);}} className="py-2.5 bg-blue-50 border-blue-200 border rounded-lg font-black text-[11px] text-blue-800 active:scale-95 outline-none disabled:opacity-50 disabled:grayscale">HBP</button>
-                                            <button disabled={isViewMode} onClick={()=>{if(!pitcher){showToast('Please select Our Pitcher!');return;} addOutcome({ type: OUTCOMES.K_SWING, pitcher, isContact: false }); setPendingContact(null);}} className="py-2.5 bg-red-50 border-red-200 border rounded-lg font-black text-[11px] text-red-800 active:scale-95 outline-none disabled:opacity-50 disabled:grayscale">K</button>
-                                            <button disabled={isViewMode} onClick={()=>{if(!pitcher){showToast('Please select Our Pitcher!');return;} addOutcome({ type: OUTCOMES.K_LOOK, pitcher, isContact: false }); setPendingContact(null);}} className="py-2.5 bg-red-50 border-red-200 border rounded-lg font-black text-[11px] text-red-800 active:scale-95 outline-none disabled:opacity-50 disabled:grayscale">ꓘ</button>
-                                        </div>
-
-                                        <div className="flex items-center justify-between mt-4 mb-2">
-                                            <h3 className="text-[9px] font-black uppercase text-slate-700">Play Outcomes</h3>
-                                            {pendingContact && <span className="text-[8px] bg-green-500 text-white px-1.5 py-0.5 rounded font-bold animate-pulse shadow-sm">Location Plotted!</span>}
-                                        </div>
-                                        <div className={`grid grid-cols-3 gap-1.5 transition-opacity ${!pendingContact && !isViewMode ? 'opacity-50' : 'opacity-100'}`}>
-                                            <button disabled={isViewMode || !pendingContact} onClick={()=>handlePlayOutcome(OUTCOMES.SINGLE)} className="py-2 bg-slate-50 border border-slate-200 rounded text-[10px] font-black active:scale-95 outline-none disabled:grayscale text-slate-800 hover:bg-slate-100">1B</button>
-                                            <button disabled={isViewMode || !pendingContact} onClick={()=>handlePlayOutcome(OUTCOMES.DOUBLE)} className="py-2 bg-slate-50 border border-slate-200 rounded text-[10px] font-black active:scale-95 outline-none disabled:grayscale text-slate-800 hover:bg-slate-100">2B</button>
-                                            <button disabled={isViewMode || !pendingContact} onClick={()=>handlePlayOutcome(OUTCOMES.TRIPLE)} className="py-2 bg-slate-50 border border-slate-200 rounded text-[10px] font-black active:scale-95 outline-none disabled:grayscale text-slate-800 hover:bg-slate-100">3B</button>
-                                            <button disabled={isViewMode || !pendingContact} onClick={()=>handlePlayOutcome(OUTCOMES.HR)} className="py-2 bg-slate-50 border border-slate-200 rounded text-[10px] font-black active:scale-95 outline-none disabled:grayscale text-slate-800 hover:bg-slate-100">HR</button>
-                                            <button disabled={isViewMode || !pendingContact} onClick={()=>handlePlayOutcome(OUTCOMES.ROE)} className="py-2 bg-orange-50 border border-orange-200 rounded text-[10px] font-black active:scale-95 outline-none disabled:grayscale text-orange-800 hover:bg-orange-100">ROE</button>
-                                            <button disabled={isViewMode || !pendingContact} onClick={()=>handlePlayOutcome(OUTCOMES.OUT)} className="py-2 bg-slate-100 border border-slate-300 rounded text-[10px] font-black active:scale-95 outline-none disabled:grayscale text-slate-800 hover:bg-slate-200">OUT</button>
-                                        </div>
-                                        {!isViewMode && pendingContact && (
-                                            <button onClick={()=>setPendingContact(null)} className="w-full mt-2 py-1.5 bg-slate-200 text-slate-600 rounded text-[9px] font-black uppercase tracking-tighter hover:bg-slate-300 active:scale-95 transition-colors">Cancel Plotted Location</button>
+                                            </div>
+                                        ) : (
+                                            <button onClick={() => setClearConfirm(true)} className="bg-white/95 text-red-600 px-3 py-1.5 rounded-lg font-black text-[9px] uppercase shadow-md border border-red-100 hover:bg-red-50 active:scale-95 flex items-center gap-1"><Icon name="trash" className="w-2.5 h-2.5" /> Clear</button>
                                         )}
                                     </div>
-                                </aside>
-                            )}
+                                )}
+                            </div>
+                        </section>
+
+                        {/* LOGS/OUTCOMES COLUMN (Tracker Only) */}
+                        {activeTab==='tracker' && (
+                            <aside className="order-2 lg:order-3 w-full lg:w-56 grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-col gap-2 shrink-0 lg:overflow-y-auto scrollbar-hide lg:pb-4">
+                                <div className="bg-white p-3 rounded-xl border shadow-sm shrink-0">
+                                    <h3 className="text-[9px] font-black uppercase text-slate-700 mb-2">Contact Log</h3>
+                                    <div className="flex gap-1 mb-2">
+                                        {['Weak','Solid','Hard'].map(q=>(
+                                            <button key={q} disabled={isViewMode} onClick={()=>setQuality(q)} className={`flex-1 py-1 rounded border text-[9px] font-black uppercase outline-none disabled:opacity-50 disabled:grayscale ${quality===q?'bg-blue-600 border-blue-600 text-white shadow-md':'bg-slate-50 text-slate-400'}`}>{q}</button>
+                                        ))}
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-1.5 pt-2 border-t border-slate-50">
+                                        {Object.entries(COLORS).map(([n,c])=>(
+                                            <button key={n} disabled={isViewMode} onClick={()=>setHitType(n)} className={`py-1.5 px-1 rounded-md border text-[9px] font-black uppercase flex items-center justify-center sm:justify-start gap-1 outline-none disabled:opacity-50 disabled:grayscale ${hitType===n?'bg-blue-50 border-blue-500 text-blue-700':'bg-white text-slate-500'}`}>
+                                                <div className="w-2 h-2 rounded-full shrink-0" style={{backgroundColor:c}}/>
+                                                <span className="hidden sm:inline">{n}</span><span className="sm:hidden">{n.split(' ')[0]}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                                
+                                <div className="bg-white p-3 rounded-xl border shadow-sm shrink-0">
+                                    <h3 className="text-[9px] font-black uppercase text-slate-700 mb-2">Plate Appearances</h3>
+                                    <div className="grid grid-cols-2 gap-1.5">
+                                        <button disabled={isViewMode} onClick={()=>{if(!pitcher){showToast('Please select Our Pitcher!');return;} addOutcome({ type: OUTCOMES.WALK, pitcher, isContact: false }); setPendingContact(null);}} className="py-2.5 bg-blue-50 border-blue-200 border rounded-lg font-black text-[11px] text-blue-800 active:scale-95 outline-none disabled:opacity-50 disabled:grayscale">BB</button>
+                                        <button disabled={isViewMode} onClick={()=>{if(!pitcher){showToast('Please select Our Pitcher!');return;} addOutcome({ type: OUTCOMES.HBP, pitcher, isContact: false }); setPendingContact(null);}} className="py-2.5 bg-blue-50 border-blue-200 border rounded-lg font-black text-[11px] text-blue-800 active:scale-95 outline-none disabled:opacity-50 disabled:grayscale">HBP</button>
+                                        <button disabled={isViewMode} onClick={()=>{if(!pitcher){showToast('Please select Our Pitcher!');return;} addOutcome({ type: OUTCOMES.K_SWING, pitcher, isContact: false }); setPendingContact(null);}} className="py-2.5 bg-red-50 border-red-200 border rounded-lg font-black text-[11px] text-red-800 active:scale-95 outline-none disabled:opacity-50 disabled:grayscale">K</button>
+                                        <button disabled={isViewMode} onClick={()=>{if(!pitcher){showToast('Please select Our Pitcher!');return;} addOutcome({ type: OUTCOMES.K_LOOK, pitcher, isContact: false }); setPendingContact(null);}} className="py-2.5 bg-red-50 border-red-200 border rounded-lg font-black text-[11px] text-red-800 active:scale-95 outline-none disabled:opacity-50 disabled:grayscale">ꓘ</button>
+                                    </div>
+
+                                    <div className="flex items-center justify-between mt-4 mb-2">
+                                        <h3 className="text-[9px] font-black uppercase text-slate-700">Play Outcomes</h3>
+                                        {pendingContact && <span className="text-[8px] bg-green-500 text-white px-1.5 py-0.5 rounded font-bold animate-pulse shadow-sm">Location Plotted!</span>}
+                                    </div>
+                                    <div className={`grid grid-cols-3 gap-1.5 transition-opacity ${!pendingContact && !isViewMode ? 'opacity-50' : 'opacity-100'}`}>
+                                        <button disabled={isViewMode || !pendingContact} onClick={()=>handlePlayOutcome(OUTCOMES.SINGLE)} className="py-2 bg-slate-50 border border-slate-200 rounded text-[10px] font-black active:scale-95 outline-none disabled:grayscale text-slate-800 hover:bg-slate-100">1B</button>
+                                        <button disabled={isViewMode || !pendingContact} onClick={()=>handlePlayOutcome(OUTCOMES.DOUBLE)} className="py-2 bg-slate-50 border border-slate-200 rounded text-[10px] font-black active:scale-95 outline-none disabled:grayscale text-slate-800 hover:bg-slate-100">2B</button>
+                                        <button disabled={isViewMode || !pendingContact} onClick={()=>handlePlayOutcome(OUTCOMES.TRIPLE)} className="py-2 bg-slate-50 border border-slate-200 rounded text-[10px] font-black active:scale-95 outline-none disabled:grayscale text-slate-800 hover:bg-slate-100">3B</button>
+                                        <button disabled={isViewMode || !pendingContact} onClick={()=>handlePlayOutcome(OUTCOMES.HR)} className="py-2 bg-slate-50 border border-slate-200 rounded text-[10px] font-black active:scale-95 outline-none disabled:grayscale text-slate-800 hover:bg-slate-100">HR</button>
+                                        <button disabled={isViewMode || !pendingContact} onClick={()=>handlePlayOutcome(OUTCOMES.ROE)} className="py-2 bg-orange-50 border border-orange-200 rounded text-[10px] font-black active:scale-95 outline-none disabled:grayscale text-orange-800 hover:bg-orange-100">ROE</button>
+                                        <button disabled={isViewMode || !pendingContact} onClick={()=>handlePlayOutcome(OUTCOMES.OUT)} className="py-2 bg-slate-100 border border-slate-300 rounded text-[10px] font-black active:scale-95 outline-none disabled:grayscale text-slate-800 hover:bg-slate-200">OUT</button>
+                                    </div>
+                                    {!isViewMode && pendingContact && (
+                                        <button onClick={()=>setPendingContact(null)} className="w-full mt-2 py-1.5 bg-slate-200 text-slate-600 rounded text-[9px] font-black uppercase tracking-tighter hover:bg-slate-300 active:scale-95 transition-colors">Cancel Plotted Location</button>
+                                    )}
+                                </div>
+                            </aside>
+                        )}
                     </main>
                 </div>
             );
